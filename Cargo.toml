@@ -1,0 +1,15 @@
+[package]
+name = "tick"
+version = "0.0.0"
+authors = ["Sean McArthur <sean.monstar@gmail.com>"]
+description = "An event loop using mio and eventual"
+license = "MIT"
+repository = "https://github.com/seanmonstar/tick"
+
+[dependencies]
+eventual = "0.1"
+mio = "0.4"
+log = "0.3"
+
+[dev-dependencies]
+env_logger = "0.3"
