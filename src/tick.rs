@@ -8,15 +8,16 @@ use transport::Transport;
 use ::{Action, Message, Protocol};
 
 
-pub struct Tick<P: Protocol, T: Transport> {
-    handler: LoopHandler<P, T>,
-    event_loop: EventLoop<LoopHandler<P, T>>
+pub struct Tick<T: Transport, F: Fn(::Transfer) -> P, P: Protocol> {
+    handler: LoopHandler<F, P, T>,
+    event_loop: EventLoop<LoopHandler<F, P, T>>
 }
 
-impl<P: Protocol, T: Transport> Tick<P, T> {
-    pub fn new() -> Tick<P, T> {
+impl<T: Transport, F: Fn(::Transfer) -> P, P: Protocol> Tick<T, F, P> {
+    pub fn new(protocol_factory: F) -> Tick<T, F, P> {
         Tick {
             handler: LoopHandler {
+                factory: protocol_factory,
                 transports: mio::util::Slab::new(4096)
             },
             event_loop: EventLoop::new().unwrap()
@@ -45,7 +46,8 @@ impl<P: Protocol, T: Transport> Tick<P, T> {
     }
 }
 
-struct LoopHandler<P: Protocol, T: Transport> {
+struct LoopHandler<F, P: Protocol, T: Transport> {
+    factory: F,
     transports: mio::util::Slab<Evented<P, T>>
 }
 
@@ -54,7 +56,7 @@ enum Evented<P: Protocol, T: Transport> {
     Stream(Stream<P, T>),
 }
 
-impl<P: Protocol, T: Transport> LoopHandler<P, T> {
+impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
     fn action(&mut self, event_loop: &mut EventLoop<Self>, token: Token, action: Action) {
         let next = match action {
             Action::Wait => {
@@ -124,7 +126,7 @@ enum Ready<T: Transport> {
     Action(Token, Action)
 }
 
-impl<P: Protocol, T: Transport> mio::Handler for LoopHandler<P, T> {
+impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> mio::Handler for LoopHandler<F, P, T> {
     type Message = Message;
     type Timeout = Token;
     fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
@@ -153,11 +155,12 @@ impl<P: Protocol, T: Transport> mio::Handler for LoopHandler<P, T> {
             },
             Ready::Insert(transport) => {
                 let notify = event_loop.channel();
+                let factory = &self.factory;
                 let maybe_token = self.transports.insert_with(move |token| {
                     trace!("inserting new stream {:?}", token);
                     let (tx, rx) = mpsc::channel();
                     let transfer = transfer::new(token, notify, tx);
-                    let proto = Protocol::on_connection(transfer);
+                    let proto = factory(transfer);
                     Evented::Stream(Stream::new(transport, proto, rx))
                 });
                 let token = match maybe_token {
