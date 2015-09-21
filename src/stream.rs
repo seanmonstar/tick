@@ -2,7 +2,7 @@ use std::io;
 use std::mem;
 use std::sync::mpsc;
 
-use mio::{self, Token, EventSet, TryRead, TryWrite};
+use mio::{Token, EventSet, TryRead, TryWrite};
 use ::{Action, Protocol, Transport};
 
 pub type Action_ = Action;
@@ -37,13 +37,17 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
             },
             (true, None) => {
                 trace!("queueing closing");
-                self.reading = Reading::Closed;
                 self.writing.closing();
             },
             (false, data) => {
                 trace!("cannot queue writing: {:?}", data);
             },
         }
+    }
+
+    pub fn close(&mut self) {
+        self.queue_writing(None);
+        self.reading = Reading::Closed;
     }
 
     pub fn ready(&mut self, token: Token, events: EventSet) {
@@ -54,6 +58,10 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
         if events.is_readable() {
             loop {
                 //TODO: check if protocol paused
+                if self.reading.is_paused() {
+                    trace!("reading is paused");
+                    break;
+                }
                 let mut buf = self.reading.close();
                 match self.transport.try_read(&mut buf) {
                     Ok(Some(0)) => {
@@ -159,6 +167,13 @@ impl Reading {
     fn pause(&mut self) {
         let buf = self.close();
         mem::replace(self, Reading::Paused(buf));
+    }
+
+    fn is_paused(&self) -> bool {
+        match *self {
+            Reading::Paused(..) => true,
+            _ => false
+        }
     }
 
     fn close(&mut self) -> Vec<u8> {

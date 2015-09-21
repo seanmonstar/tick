@@ -5,23 +5,19 @@
 //! # Example
 //!
 //! ```rust
-//! use tick::{Tick, Protocol, Tcp};
+//! use tick::{Tick, Protocol, Transfer};
 //!
-//! struct Echo;
+//! struct Echo(Transfer);
 //! impl Protocol<Tcp> for Echo {
-//!     fn on_connection(transport: &mut Tcp) -> Echo {
-//!         Echo
-//!     }
-//!     fn on_data(&mut self, data: &[u8], transport: &mut Tcp) {
+//!     fn on_data(&mut self, data: &[u8]) {
 //!         println!("data received: {:?}", data);
-//!         transport.write(data);
+//!         self.0.write(data);
 //!     }
 //! }
 //!
-//! let mut tick = Tick::<Echo>::new();
+//! let mut tick = Tick::new(Echo);
 //! tick.accept(listener);
-//! tick.stream(tcp::connect());
-//! tick.run(&mut event_loop);
+//! tick.run();
 //! ```
 
 #![cfg_attr(test, deny(warnings))]
@@ -31,13 +27,12 @@ extern crate eventual;
 #[macro_use] extern crate log;
 extern crate mio;
 
-use std::time::Duration;
-
-pub use tick::Tick;
+pub use tick::{Tick, Notify};
 pub use protocol::Protocol;
 pub use transfer::Transfer;
 pub use transport::Transport;
 
+mod handler;
 mod protocol;
 mod stream;
 mod tick;
@@ -48,6 +43,7 @@ enum Action {
     Wait,
     Register(mio::EventSet),
     Write(Option<Vec<u8>>),
+    Close,
     Remove,
 }
 
@@ -73,9 +69,7 @@ impl From<::std::io::Error> for Error {
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
-/*
-pub type Stream<T> = eventual::Stream<T, Error>;
-pub type Sender<T> = eventual::Sender<T, Error>;
-pub type Pair<T> = (Sender<T>, Stream<T>);
-pub type Future<T> = eventual::Future<T, Error>;
-*/
+
+/// Opaque ID returned when adding listeners and streams to the loop.
+#[derive(Debug)]
+pub struct Id(::mio::Token);

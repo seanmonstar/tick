@@ -27,6 +27,12 @@ impl Transfer {
         ).unwrap();
     }
 
+    pub fn eof(&mut self) {
+        self.notify.send(
+            Message::Action(self.token, Action::Write(None))
+        ).unwrap();
+    }
+
     pub fn resume(&mut self) {
         self.notify.send(
             Message::Action(self.token, Action::Register(mio::EventSet::readable()))
@@ -36,10 +42,16 @@ impl Transfer {
     pub fn close(&mut self) {
         //TODO: consume self?
         self.notify.send(
-            Message::Action(self.token, Action::Write(None))
+            Message::Action(self.token, Action::Close)
         ).unwrap();
     }
 
-    // fn pause()
     // fn abort()
+    // fn pause()
+}
+
+impl Drop for Transfer {
+    fn drop(&mut self) {
+        self.close();
+    }
 }

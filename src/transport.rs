@@ -2,7 +2,7 @@ use std::io;
 
 use mio::{Evented, TryAccept};
 
-pub trait Transport: Evented + io::Read + io::Write {
+pub trait Transport: Evented + io::Read + io::Write + Sized {
     type Listener: Evented + TryAccept<Output=Self>;
 }
 

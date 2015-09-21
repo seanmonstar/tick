@@ -1,6 +1,3 @@
-use ::Transfer;
-
-
 pub trait Protocol {
     fn on_data(&mut self, data: &[u8]) {
         trace!("ignored on_data({:?})", data);
