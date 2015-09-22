@@ -60,7 +60,7 @@ impl Transfer {
 }
 
 impl fmt::Debug for Transfer {
-    fn fmt(&self, f: &mut fmt::Foramtter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Transfer")
             .field("token", &self.token)
             .finish()
