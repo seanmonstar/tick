@@ -96,7 +96,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
                         return;
                     }
                     None => {
-                        error!("unknown token {:?}", token);
+                        warn!("Action::Write unknown token {:?}", token);
                         return;
                     }
                 }
@@ -113,7 +113,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
                         return;
                     }
                     None => {
-                        error!("unknown token {:?}", token);
+                        warn!("Action::Close unknown token {:?}", token);
                         return;
                     }
                 }
@@ -135,6 +135,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
                         return;
                     }
                     None => {
+                        error!("Action::Register unknown token {:?}, '{:?}'", token, events);
                         error!("unknown token {:?}", token);
                         return;
                     }
