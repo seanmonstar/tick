@@ -18,8 +18,8 @@ fn main() {
     env_logger::init().unwrap();
     let mut tick = tick::Tick::<mio::tcp::TcpStream, _, _>::new(Echo);
 
-    let sock = mio::tcp::TcpListener::bind(&"127.0.0.1:3000".parse().unwrap()).unwrap();
+    let sock = mio::tcp::TcpListener::bind(&"127.0.0.1:3300".parse().unwrap()).unwrap();
     tick.accept(sock).unwrap();
-    println!("Listening on 127.0.0.1:3000");
+    println!("Listening on 127.0.0.1:3300");
     tick.run().unwrap();
 }

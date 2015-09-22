@@ -39,6 +39,7 @@ mod tick;
 mod transfer;
 mod transport;
 
+#[derive(Clone, PartialEq, Debug)]
 enum Action {
     Wait,
     Register(mio::EventSet),

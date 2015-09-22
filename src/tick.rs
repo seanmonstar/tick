@@ -10,10 +10,26 @@ pub struct Tick<T: Transport, F: Fn(::Transfer) -> P, P: Protocol> {
     event_loop: EventLoop<LoopHandler<F, P, T>>
 }
 
+pub struct TickConfig {
+    pub notify_queue_size: usize,
+}
+
+impl Default for TickConfig {
+    fn default() -> TickConfig {
+        TickConfig {
+            notify_queue_size: 4096
+        }
+    }
+}
+
 impl<T: Transport, F: Fn(::Transfer) -> P, P: Protocol> Tick<T, F, P> {
     pub fn new(protocol_factory: F) -> Tick<T, F, P> {
+        Tick::configured(protocol_factory, Default::default())
+    }
+
+    pub fn configured(factory: F, _config: TickConfig) -> Tick<T, F, P> {
         Tick {
-            handler: LoopHandler::new(protocol_factory),
+            handler: LoopHandler::new(factory),
             event_loop: EventLoop::new().unwrap()
         }
     }

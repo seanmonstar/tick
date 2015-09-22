@@ -1,4 +1,5 @@
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
+use std::sync::atomic::AtomicBool;
 
 use mio::{self, EventLoop, Token, EventSet, PollOpt, TryAccept};
 
@@ -50,9 +51,10 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
         let maybe_token = self.transports.insert_with(move |token| {
             trace!("inserting new stream {:?}", token);
             let (tx, rx) = mpsc::channel();
-            let transfer = transfer::new(token, notify, tx);
+            let is_queued = Arc::new(AtomicBool::new(false));
+            let transfer = transfer::new(token, notify, tx, is_queued.clone());
             let proto = factory(transfer);
-            Evented::Stream(Stream::new(transport, proto, rx))
+            Evented::Stream(Stream::new(transport, proto, rx, is_queued))
         });
         let token = match maybe_token {
             Some(token) => token,

@@ -1,6 +1,7 @@
 use std::io;
 use std::mem;
-use std::sync::mpsc;
+use std::sync::{Arc, mpsc};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use mio::{Token, EventSet, TryRead, TryWrite};
 use ::{Action, Protocol, Transport};
@@ -11,17 +12,21 @@ pub struct Stream<P: Protocol, T: Transport> {
     transport: T,
     protocol: P,
     rx: mpsc::Receiver<Action>,
+    is_queued: Arc<AtomicBool>,
+    last_action: Option<Action>,
     reading: Reading,
     writing: Writing,
 }
 
 impl<P: Protocol, T: Transport> Stream<P, T> {
 
-    pub fn new(transport: T, protocol: P, rx: mpsc::Receiver<Action_>) -> Stream<P, T> {
+    pub fn new(transport: T, protocol: P, rx: mpsc::Receiver<Action_>, is_queued: Arc<AtomicBool>) -> Stream<P, T> {
         Stream {
             transport: transport,
             protocol: protocol,
             rx: rx,
+            is_queued: is_queued,
+            last_action: None,
             reading: Reading::Open(vec![0; 4096]),
             writing: Writing::Waiting(io::Cursor::new(vec![])),
         }
@@ -30,7 +35,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
     pub fn queue_writing(&mut self, data: Option<Vec<u8>>) {
         match (self.writing.can_write(), data) {
             (true, Some(bytes)) => {
-                trace!("queueing writing");
+                trace!("queue writing {} bytes", bytes.len());
                 let mut buf = self.writing.close();
                 buf.get_mut().extend(&bytes);
                 self.writing.open(buf);
@@ -43,6 +48,18 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
                 trace!("cannot queue writing: {:?}", data);
             },
         }
+        self.process_queue();
+    }
+
+    fn process_queue(&mut self) {
+        if self.is_queued.swap(false, Ordering::Acquire) {
+            while let Ok(action) = self.rx.try_recv() {
+                match action {
+                    Action::Write(data) => self.queue_writing(data),
+                    other => trace!("unhandled queued action {:?}", other)
+                }
+            }
+        }
     }
 
     pub fn close(&mut self) {
@@ -51,6 +68,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
     }
 
     pub fn ready(&mut self, token: Token, events: EventSet) {
+        self.last_action = None;
         if events.is_error() {
             debug!("error event on {:?}", token);
         }
@@ -127,15 +145,14 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
                 }
             }
         }
-
     }
 
     pub fn transport(&self) -> &T {
         &self.transport
     }
 
-    pub fn action(&self) -> Action {
-        match (&self.reading, &self.writing) {
+    pub fn action(&mut self) -> Action {
+        let action = match (&self.reading, &self.writing) {
             (&Reading::Open(_), &Writing::Open(_)) |(&Reading::Open(_), &Writing::Closing(_)) => Action::Register(EventSet::readable() | EventSet::writable()),
             (&Reading::Closed, &Writing::Closed) => Action::Remove,
 
@@ -143,7 +160,15 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
             (_, &Writing::Open(_)) | (_, &Writing::Closing(_)) => Action::Register(EventSet::writable()),
 
             _ => Action::Wait
+        };
+
+        if let Some(ref last) = self.last_action {
+            if *last == action {
+                return Action::Wait
+            }
         }
+        self.last_action = Some(action.clone());
+        action
     }
 
     fn on_error(&mut self, e: ::Error) {
