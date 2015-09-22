@@ -81,13 +81,13 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
     fn action(&mut self, event_loop: &mut EventLoop<Self>, token: Token, action: Action) {
         let next = match action {
             Action::Wait => {
-                debug!("Action::Wait token={:?}", token);
+                debug!("Action::Wait {:?}", token);
                 return;
             }
             Action::Write(data) => {
                 match self.transports.get_mut(token) {
                     Some(&mut Evented::Stream(ref mut stream)) => {
-                        debug!("Action::Write token={:?}, data={:?}", token, data.is_some());
+                        debug!("Action::Write {:?}, data={:?}", token, data.is_some());
                         stream.queue_writing(data);
                         stream.action()
                     }
@@ -104,7 +104,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
             Action::Close => {
                 match self.transports.get_mut(token) {
                     Some(&mut Evented::Stream(ref mut stream)) => {
-                        debug!("Action::Close token={:?}", token);
+                        debug!("Action::Close {:?}", token);
                         stream.close();
                         stream.action()
                     }
@@ -121,7 +121,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
             Action::Register(events) => {
                 match self.transports.get_mut(token) {
                     Some(&mut Evented::Stream(ref mut stream)) => {
-                        debug!("Action::Register token={:?}, events='{:?}'", token, events);
+                        debug!("Action::Register {:?}, '{:?}'", token, events);
                         event_loop.reregister(
                             stream.transport(),
                             token,
@@ -168,7 +168,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> mio::Handler for LoopHan
     type Message = Message_;
     type Timeout = Token;
     fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
-        debug!("Ready token={:?}, events='{:?}'", token, events);
+        debug!("> Ready {:?} '{:?}'", token, events);
         let next = match self.transports.get_mut(token) {
             Some(&mut Evented::Listener(ref lis)) => {
                 match lis.accept() {
@@ -200,11 +200,11 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> mio::Handler for LoopHan
     fn notify(&mut self, event_loop: &mut EventLoop<Self>, msg: Message) {
         match msg {
             Message::Action(token, action) => {
-                debug!("Notify Message::Action {:?}", token);
+                debug!("> Notify Message::Action {:?}", token);
                 self.action(event_loop, token, action);
             }
             Message::Shutdown => {
-                debug!("Notify Message::Shutdown");
+                debug!("> Notify Message::Shutdown");
                 event_loop.shutdown();
             }
         }

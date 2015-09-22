@@ -164,6 +164,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
 
         if let Some(ref last) = self.last_action {
             if *last == action {
+                trace!("< Action is the same {:?}, Waiting", action);
                 return Action::Wait
             }
         }
