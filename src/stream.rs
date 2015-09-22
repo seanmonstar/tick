@@ -67,6 +67,12 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
         self.reading = Reading::Closed;
     }
 
+    fn abort(&mut self) {
+        self.reading = Reading::Closed;
+        self.writing = Writing::Closed;
+        self.protocol.on_end(None);
+    }
+
     pub fn ready(&mut self, token: Token, events: EventSet) {
         self.last_action = None;
         if events.is_error() {
@@ -85,6 +91,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
                     Ok(Some(0)) => {
                         trace!("read eof {:?}", token);
                         self.protocol.on_eof();
+                        self.abort();
                         break;
                     }
                     Ok(Some(n)) => {
@@ -111,7 +118,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
             while buf.position() < buf.get_ref().len() as u64 {
                 match self.transport.try_write_buf(&mut buf) {
                     Ok(Some(0)) => {
-                        trace!("===> write 0 means what again? {:?}", token);
+                        error!("===> write 0 means what again? {:?}", token);
                         break;
                     },
                     Ok(Some(n)) => {
