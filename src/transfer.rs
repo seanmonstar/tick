@@ -1,3 +1,4 @@
+use std::fmt;
 use std::sync::{Arc, mpsc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use mio;
@@ -56,6 +57,14 @@ impl Transfer {
     }
     // fn abort()
     // fn pause()
+}
+
+impl fmt::Debug for Transfer {
+    fn fmt(&self, f: &mut fmt::Foramtter) -> fmt::Result {
+        f.debug_struct("Transfer")
+            .field("token", &self.token)
+            .finish()
+    }
 }
 
 impl Drop for Transfer {
