@@ -23,7 +23,6 @@
 #![cfg_attr(test, deny(warnings))]
 #![cfg_attr(test, deny(missing_docs))]
 
-extern crate eventual;
 #[macro_use] extern crate log;
 extern crate mio;
 

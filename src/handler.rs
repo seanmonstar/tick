@@ -33,7 +33,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
                          .map_err(|_| ::Error::TooManySockets));
         match self.transports.get(token) {
             Some(&Evented::Listener(ref lis)) => {
-                try!(event_loop.register_opt(
+                try!(event_loop.register(
                     lis,
                     token,
                     EventSet::readable(),
@@ -66,7 +66,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
         match self.transports.get(token) {
             Some(&Evented::Stream(ref stream)) => {
                 trace!("registering initial Readable for {:?}", token);
-                try!(event_loop.register_opt(
+                try!(event_loop.register(
                     stream.transport(),
                     token,
                     EventSet::readable(),

@@ -7,8 +7,7 @@ license = "MIT"
 repository = "https://github.com/seanmonstar/tick"
 
 [dependencies]
-eventual = { git = "https://github.com/carllerche/eventual" }
-mio = "0.4"
+mio = { git = "https://github.com/carllerche/mio" }
 log = "0.3"
 
 [dev-dependencies]
