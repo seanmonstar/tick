@@ -7,6 +7,7 @@ use ::{Action, Message};
 pub type Action_ = Action;
 pub type Message_ = Message;
 
+#[derive(Clone)]
 pub struct Transfer {
     token: mio::Token,
     notify: mio::Sender<Message>,
