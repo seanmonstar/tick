@@ -87,6 +87,8 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
         self.queue();
         if events.is_error() {
             debug!("error event on {:?}", token);
+            //TODO: try to use self.transport.take_socket_error()
+            //requires adding a method to the Transport trait
         }
 
         if events.is_readable() {
