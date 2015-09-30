@@ -3,19 +3,19 @@ use std::sync::{Arc, mpsc};
 use std::sync::atomic::{AtomicBool, Ordering};
 use mio;
 
-use ::{Action, Message};
-pub type Action_ = Action;
+use ::{Action, Message, Queued};
 pub type Message_ = Message;
+pub type Queued_ = Queued;
 
 #[derive(Clone)]
 pub struct Transfer {
     token: mio::Token,
     notify: mio::Sender<Message>,
     is_notified: Arc<AtomicBool>,
-    sender: mpsc::Sender<Action>,
+    sender: mpsc::Sender<Queued>,
 }
 
-pub fn new(token: mio::Token, notify: mio::Sender<Message_>, sender: mpsc::Sender<Action_>, is_notified: Arc<AtomicBool>) -> Transfer {
+pub fn new(token: mio::Token, notify: mio::Sender<Message_>, sender: mpsc::Sender<Queued_>, is_notified: Arc<AtomicBool>) -> Transfer {
     Transfer {
         token: token,
         notify: notify,
@@ -27,17 +27,19 @@ pub fn new(token: mio::Token, notify: mio::Sender<Message_>, sender: mpsc::Sende
 impl Transfer {
 
     pub fn write(&mut self, data: &[u8]) {
-        self.send(Action::Write(Some(data.to_vec())));
+        self.send(Queued::Write(Some(data.to_vec())));
     }
 
     pub fn eof(&mut self) {
-        self.send(Action::Write(None));
+        self.send(Queued::Write(None));
     }
 
     pub fn resume(&mut self) {
-        self.notify.send(
-            Message::Action(self.token, Action::Register(mio::EventSet::readable()))
-        ).unwrap();
+        self.send(Queued::Resume);
+    }
+
+    pub fn pause(&mut self) {
+        self.send(Queued::Pause);
     }
 
     pub fn close(&mut self) {
@@ -48,13 +50,13 @@ impl Transfer {
     }
 
 
-    fn send(&self, action: Action) {
+    fn send(&self, action: Queued) {
         if self.is_notified.load(Ordering::Acquire) {
-            self.sender.send(action);
-        } else {
-            self.notify.send(Message::Action(self.token, action)).unwrap();
+            self.notify.send(Message::Action(self.token, Action::Queued)).unwrap();
             self.is_notified.store(true, Ordering::Release);
+        } else {
         }
+        self.sender.send(action);
     }
     // fn abort()
     // fn pause()

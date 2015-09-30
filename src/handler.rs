@@ -84,19 +84,19 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
                 debug!("Action::Wait {:?}", token);
                 return;
             }
-            Action::Write(data) => {
+            Action::Queued => {
                 match self.transports.get_mut(token) {
                     Some(&mut Evented::Stream(ref mut stream)) => {
-                        debug!("Action::Write {:?}, data={:?}", token, data.is_some());
-                        stream.queue_writing(data);
+                        debug!("Action::Queued {:?}", token);
+                        stream.queue();
                         stream.action()
                     }
                     Some(_) => {
-                        error!("cannot write to listeners");
+                        error!("cannot queue on listeners");
                         return;
                     }
                     None => {
-                        warn!("Action::Write unknown token {:?}", token);
+                        warn!("Action::Queued unknown token {:?}", token);
                         return;
                     }
                 }

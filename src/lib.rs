@@ -42,11 +42,17 @@ mod transport;
 enum Action {
     Wait,
     Register(mio::EventSet),
-    Write(Option<Vec<u8>>),
+    Queued,
     Close,
     Remove,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+enum Queued {
+    Resume,
+    Pause,
+    Write(Option<Vec<u8>>),
+}
 
 enum Message {
     //Timeout(Duration, ::eventual::Complete<(), Error>),

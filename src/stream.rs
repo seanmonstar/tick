@@ -4,14 +4,14 @@ use std::sync::{Arc, mpsc};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use mio::{Token, EventSet, TryRead, TryWrite};
-use ::{Action, Protocol, Transport};
+use ::{Action, Queued, Protocol, Transport};
 
-pub type Action_ = Action;
+pub type Queued_ = Queued;
 
 pub struct Stream<P: Protocol, T: Transport> {
     transport: T,
     protocol: P,
-    rx: mpsc::Receiver<Action>,
+    rx: mpsc::Receiver<Queued>,
     is_queued: Arc<AtomicBool>,
     last_action: Option<Action>,
     reading: Reading,
@@ -20,7 +20,7 @@ pub struct Stream<P: Protocol, T: Transport> {
 
 impl<P: Protocol, T: Transport> Stream<P, T> {
 
-    pub fn new(transport: T, protocol: P, rx: mpsc::Receiver<Action_>, is_queued: Arc<AtomicBool>) -> Stream<P, T> {
+    pub fn new(transport: T, protocol: P, rx: mpsc::Receiver<Queued_>, is_queued: Arc<AtomicBool>) -> Stream<P, T> {
         Stream {
             transport: transport,
             protocol: protocol,
@@ -32,7 +32,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
         }
     }
 
-    pub fn queue_writing(&mut self, data: Option<Vec<u8>>) {
+    fn queue_writing(&mut self, data: Option<Vec<u8>>) {
         match (self.writing.can_write(), data) {
             (true, Some(bytes)) => {
                 trace!("queue writing {} bytes", bytes.len());
@@ -48,18 +48,27 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
                 trace!("cannot queue writing: {:?}", data);
             },
         }
-        self.process_queue();
     }
 
-    fn process_queue(&mut self) {
-        if self.is_queued.swap(false, Ordering::Acquire) {
-            while let Ok(action) = self.rx.try_recv() {
-                match action {
-                    Action::Write(data) => self.queue_writing(data),
-                    other => trace!("unhandled queued action {:?}", other)
-                }
+    fn pause(&mut self) {
+        trace!("pause");
+        self.reading.pause();
+    }
+
+    fn resume(&mut self) {
+        trace!("resume");
+        self.reading.resume();
+    }
+
+    pub fn queue(&mut self) {
+        while let Ok(q) = self.rx.try_recv() {
+            match q {
+                Queued::Write(data) => self.queue_writing(data),
+                Queued::Pause => self.pause(),
+                Queued::Resume => self.resume(),
             }
         }
+        self.is_queued.store(false, Ordering::Release);
     }
 
     pub fn close(&mut self) {
@@ -75,6 +84,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
 
     pub fn ready(&mut self, token: Token, events: EventSet) {
         self.last_action = None;
+        self.queue();
         if events.is_error() {
             debug!("error event on {:?}", token);
         }
@@ -109,6 +119,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
                         return;
                     }
                 }
+                self.queue();
             }
         }
 
@@ -194,6 +205,11 @@ enum Reading {
 
 impl Reading {
     fn open(&mut self, buf: Vec<u8>) {
+        mem::replace(self, Reading::Open(buf));
+    }
+
+    fn resume(&mut self) {
+        let buf = self.close();
         mem::replace(self, Reading::Open(buf));
     }
 
