@@ -43,12 +43,13 @@ impl Transfer {
     }
 
     pub fn close(&mut self) {
-        //TODO: consume self?
-        self.notify.send(
-            Message::Action(self.token, Action::Close)
-        ).unwrap();
+        self.send(Queued::Close);
     }
 
+    pub fn abort(&mut self) {
+        //TODO: consume self?
+        self.notify.send(Message::Action(self.token, Action::Remove)).unwrap();
+    }
 
     fn send(&self, action: Queued) {
         if !self.is_notified.load(Ordering::Acquire) {
@@ -58,8 +59,6 @@ impl Transfer {
         }
         self.sender.send(action);
     }
-    // fn abort()
-    // fn pause()
 }
 
 impl fmt::Debug for Transfer {
@@ -70,8 +69,11 @@ impl fmt::Debug for Transfer {
     }
 }
 
+/*
 impl Drop for Transfer {
     fn drop(&mut self) {
+        trace!("Transfer::drop {:?}", self.token);
         self.close();
     }
 }
+*/

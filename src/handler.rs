@@ -101,23 +101,6 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
                     }
                 }
             }
-            Action::Close => {
-                match self.transports.get_mut(token) {
-                    Some(&mut Evented::Stream(ref mut stream)) => {
-                        debug!("  Action::Close {:?}", token);
-                        stream.close();
-                        stream.action()
-                    }
-                    Some(_) => {
-                        error!("cannot close listeners");
-                        return;
-                    }
-                    None => {
-                        warn!("  Action::Close unknown token {:?}", token);
-                        return;
-                    }
-                }
-            }
             Action::Register(events) => {
                 match self.transports.get_mut(token) {
                     Some(&mut Evented::Stream(ref mut stream)) => {

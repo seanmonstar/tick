@@ -43,7 +43,6 @@ enum Action {
     Wait,
     Register(mio::EventSet),
     Queued,
-    Close,
     Remove,
 }
 
@@ -52,6 +51,7 @@ enum Queued {
     Resume,
     Pause,
     Write(Option<Vec<u8>>),
+    Close,
 }
 
 enum Message {

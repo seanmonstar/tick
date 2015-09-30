@@ -66,12 +66,13 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
                 Queued::Write(data) => self.queue_writing(data),
                 Queued::Pause => self.pause(),
                 Queued::Resume => self.resume(),
+                Queued::Close => self.close(),
             }
         }
         self.is_queued.store(false, Ordering::Release);
     }
 
-    pub fn close(&mut self) {
+    fn close(&mut self) {
         self.queue_writing(None);
         self.reading = Reading::Closed;
     }
