@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use mio::EventLoop;
 
 use handler::LoopHandler;
@@ -58,11 +60,19 @@ impl<T: Transport, F: Fn(::Transfer) -> P, P: Protocol> Tick<T, F, P> {
     }
 }
 
+#[derive(Clone)]
 pub struct Notify {
     sender: ::mio::Sender<Message>
 }
 
 impl Notify {
+    pub fn timeout<F: FnOnce() + Send + 'static>(&self, f: F, when: Duration) {
+        let mut env = Some(f);
+        let ms = when.as_secs() * 1_000 + (when.subsec_nanos() as u64) / 1_000_000;
+        self.sender.send(Message::Timeout(Box::new(move || {
+            env.take().map(|f| f());
+        }), ms));
+    }
     pub fn shutdown(&self) {
         self.sender.send(Message::Shutdown).unwrap();
     }

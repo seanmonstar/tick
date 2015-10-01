@@ -67,9 +67,8 @@ impl ::std::fmt::Debug for Queued {
 }
 
 enum Message {
-    //Timeout(Duration, ::eventual::Complete<(), Error>),
+    Timeout(Box<FnMut() + Send + 'static>, u64),
     Action(mio::Token, Action),
-    #[allow(unused)]
     Shutdown,
 }
 

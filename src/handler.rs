@@ -8,6 +8,7 @@ use transfer;
 use ::{Action, Message, Protocol, Transport};
 
 pub type Message_ = Message;
+pub type Thunk = Box<FnMut() + Send + 'static>;
 
 pub struct LoopHandler<F, P: Protocol, T: Transport> {
     pub transports: mio::util::Slab<Evented<P, T>>,
@@ -149,7 +150,7 @@ enum Ready<T: Transport> {
 
 impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> mio::Handler for LoopHandler<F, P, T> {
     type Message = Message_;
-    type Timeout = Token;
+    type Timeout = Thunk;
     fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
         debug!("> Ready {:?} '{:?}'", token, events);
         let next = match self.transports.get_mut(token) {
@@ -180,8 +181,17 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> mio::Handler for LoopHan
         }
     }
 
+    fn timeout(&mut self, event_loop: &mut EventLoop<Self>, mut cb: Thunk) {
+        debug!("< Timeout");
+        cb();
+    }
+
     fn notify(&mut self, event_loop: &mut EventLoop<Self>, msg: Message) {
         match msg {
+            Message::Timeout(cb, when) => {
+                debug!("< Notify Message::Timeout {}ms", when);
+                event_loop.timeout_ms(cb, when);
+            }
             Message::Action(token, action) => {
                 debug!("< Notify Message::Action {:?}", token);
                 self.action(event_loop, token, action);
@@ -191,5 +201,9 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> mio::Handler for LoopHan
                 event_loop.shutdown();
             }
         }
+    }
+
+    fn tick(&mut self, _event_loop: &mut EventLoop<Self>) {
+    
     }
 }
