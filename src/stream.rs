@@ -143,7 +143,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
             }
         }
 
-        if events.is_writable() {
+        if events.is_writable() && !self.writing.is_closed() {
             let is_closing = !self.writing.can_write();
             let mut buf = self.writing.close();
             while buf.position() < buf.get_ref().len() as u64 {
@@ -296,6 +296,13 @@ impl Writing {
             Writing::Waiting(buf) => buf,
             Writing::Closing(buf) => buf,
             _ => panic!("already closed")
+        }
+    }
+
+    fn is_closed(&self) -> bool {
+        match *self {
+            Writing::Closed => true,
+            _ => false
         }
     }
 }
