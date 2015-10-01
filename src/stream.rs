@@ -52,12 +52,16 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
 
     fn pause(&mut self) {
         trace!("pause");
-        self.reading.pause();
+        if self.reading.is_open() {
+            self.reading.pause();
+        }
     }
 
     fn resume(&mut self) {
-        trace!("resume");
-        self.reading.resume();
+        if self.reading.is_paused() {
+            trace!("resume");
+            self.reading.resume();
+        }
     }
 
     pub fn queue(&mut self) {
@@ -210,6 +214,13 @@ enum Reading {
 impl Reading {
     fn open(&mut self, buf: Vec<u8>) {
         mem::replace(self, Reading::Open(buf));
+    }
+
+    fn is_open(&self) -> bool {
+        match *self {
+            Reading::Open(..) => true,
+            _ => false
+        }
     }
 
     fn resume(&mut self) {
