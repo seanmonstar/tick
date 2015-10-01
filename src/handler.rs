@@ -89,8 +89,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
                 match self.transports.get_mut(token) {
                     Some(&mut Evented::Stream(ref mut stream)) => {
                         debug!("  Action::Queued {:?}", token);
-                        stream.queue();
-                        stream.action()
+                        stream.queued()
                     }
                     Some(_) => {
                         error!("cannot queue on listeners");
@@ -152,7 +151,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> mio::Handler for LoopHan
     type Message = Message_;
     type Timeout = Thunk;
     fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
-        debug!("> Ready {:?} '{:?}'", token, events);
+        debug!("< Ready {:?} '{:?}'", token, events);
         let next = match self.transports.get_mut(token) {
             Some(&mut Evented::Listener(ref lis)) => {
                 match lis.accept() {

@@ -64,7 +64,20 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
         }
     }
 
-    pub fn queue(&mut self) {
+    /// This is called from EventLoop::notify() only
+    pub fn queued(&mut self) -> Action {
+        match self.last_action {
+            Some(Action::Register(ref events)) => {
+                warn!("! Queued and Registered({:?})", events);
+            }
+            _ => ()
+        }
+        self.process_queue();
+        self.is_queued.store(false, Ordering::Release);
+        self.action()
+    }
+
+    pub fn process_queue(&mut self) {
         while let Ok(q) = self.rx.try_recv() {
             debug!("- {:?}", q);
             match q {
@@ -74,7 +87,6 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
                 Queued::Close => self.close(),
             }
         }
-        self.is_queued.store(false, Ordering::Release);
     }
 
     fn close(&mut self) {
@@ -90,7 +102,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
 
     pub fn ready(&mut self, token: Token, events: EventSet) {
         self.last_action = None;
-        self.queue();
+        self.process_queue();
         if events.is_error() {
             debug!("error event on {:?}", token);
             //TODO: try to use self.transport.take_socket_error()
@@ -127,7 +139,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
                         return;
                     }
                 }
-                self.queue();
+                self.process_queue();
             }
         }
 
