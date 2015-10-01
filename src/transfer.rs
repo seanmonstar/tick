@@ -53,10 +53,11 @@ impl Transfer {
 
     fn send(&self, action: Queued) {
         if !self.is_notified.load(Ordering::Acquire) {
-            debug!("> Send Action::Queued");
+            debug!("> Send Action::Queued {:?}", self.token);
             self.notify.send(Message::Action(self.token, Action::Queued)).unwrap();
             self.is_notified.store(true, Ordering::Release);
         }
+        debug!("+ {:?} {:?}", action, self.token);
         self.sender.send(action);
     }
 }

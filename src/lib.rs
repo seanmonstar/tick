@@ -46,12 +46,24 @@ enum Action {
     Remove,
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq)]
 enum Queued {
     Resume,
     Pause,
     Write(Option<Vec<u8>>),
     Close,
+}
+
+impl ::std::fmt::Debug for Queued {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self {
+            Queued::Resume => f.write_str("Queued::Resume"),
+            Queued::Pause => f.write_str("Queued::Pause"),
+            Queued::Write(Some(ref data)) => write!(f, "Queued::Write(Bytes({}))", data.len()),
+            Queued::Write(None) => f.write_str("Queued::Write(Eof)"),
+            Queued::Close => f.write_str("Queued::Close"),
+        }
+    }
 }
 
 enum Message {

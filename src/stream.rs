@@ -62,6 +62,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
 
     pub fn queue(&mut self) {
         while let Ok(q) = self.rx.try_recv() {
+            debug!("- {:?}", q);
             match q {
                 Queued::Write(data) => self.queue_writing(data),
                 Queued::Pause => self.pause(),
