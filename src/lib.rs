@@ -110,3 +110,5 @@ impl slab::Index for Id {
         (self.0).0
     }
 }
+
+pub type Slab<T> = slab::Slab<T, Id>;
