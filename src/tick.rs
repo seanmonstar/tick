@@ -1,38 +1,42 @@
 use std::time::Duration;
 
-use mio::EventLoop;
+use mio::{EventLoop, EventLoopConfig};
 
 use handler::LoopHandler;
 use transport::Transport;
 use ::{Message, Protocol};
 
 
-pub struct Tick<T: Transport, F: Fn(::Transfer) -> P, P: Protocol> {
+pub struct Tick<T: Transport, F: Fn(::Transfer, ::Id) -> P, P: Protocol> {
     handler: LoopHandler<F, P, T>,
     event_loop: EventLoop<LoopHandler<F, P, T>>
 }
 
 pub struct TickConfig {
-    pub notify_queue_size: usize,
+    transports_capacity: usize,
+    notify_capacity: usize,
 }
 
-impl Default for TickConfig {
-    fn default() -> TickConfig {
+impl TickConfig {
+    pub fn new() -> TickConfig {
         TickConfig {
-            notify_queue_size: 4096
+            transports_capacity: 8_192,
+            notify_capacity: 8_192,
         }
     }
 }
 
-impl<T: Transport, F: Fn(::Transfer) -> P, P: Protocol> Tick<T, F, P> {
+impl<T: Transport, F: Fn(::Transfer, ::Id) -> P, P: Protocol> Tick<T, F, P> {
     pub fn new(protocol_factory: F) -> Tick<T, F, P> {
-        Tick::configured(protocol_factory, Default::default())
+        Tick::configured(protocol_factory, TickConfig::new())
     }
 
-    pub fn configured(factory: F, _config: TickConfig) -> Tick<T, F, P> {
+    pub fn configured(factory: F, config: TickConfig) -> Tick<T, F, P> {
+        let mut loop_config = EventLoopConfig::new();
+        loop_config.notify_capacity(config.notify_capacity);
         Tick {
-            handler: LoopHandler::new(factory),
-            event_loop: EventLoop::new().unwrap()
+            handler: LoopHandler::new(factory, config.transports_capacity),
+            event_loop: EventLoop::configured(loop_config).unwrap()
         }
     }
 

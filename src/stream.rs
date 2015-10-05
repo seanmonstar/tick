@@ -11,6 +11,7 @@ pub type Queued_ = Queued;
 pub struct Stream<P: Protocol, T: Transport> {
     transport: T,
     protocol: P,
+    token: Token,
     rx: mpsc::Receiver<Queued>,
     is_queued: Arc<AtomicBool>,
     last_action: Option<Action>,
@@ -20,10 +21,11 @@ pub struct Stream<P: Protocol, T: Transport> {
 
 impl<P: Protocol, T: Transport> Stream<P, T> {
 
-    pub fn new(transport: T, protocol: P, rx: mpsc::Receiver<Queued_>, is_queued: Arc<AtomicBool>) -> Stream<P, T> {
+    pub fn new(token: Token, transport: T, protocol: P, rx: mpsc::Receiver<Queued_>, is_queued: Arc<AtomicBool>) -> Stream<P, T> {
         Stream {
             transport: transport,
             protocol: protocol,
+            token: token,
             rx: rx,
             is_queued: is_queued,
             last_action: None,
@@ -35,23 +37,23 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
     fn queue_writing(&mut self, data: Option<Vec<u8>>) {
         match (self.writing.can_write(), data) {
             (true, Some(bytes)) => {
-                trace!("queue writing {} bytes", bytes.len());
+                trace!("queue writing {} bytes {:?}", bytes.len(), self.token);
                 let mut buf = self.writing.close();
                 buf.get_mut().extend(&bytes);
                 self.writing.open(buf);
             },
             (true, None) => {
-                trace!("queueing closing");
+                trace!("queueing closing {:?}", self.token);
                 self.writing.closing();
             },
             (false, data) => {
-                trace!("cannot queue writing: {:?}", data);
+                warn!("cannot queue writing: {:?} {:?}", data, self.token);
             },
         }
     }
 
     fn pause(&mut self) {
-        trace!("pause");
+        trace!("pause {:?}", self.token);
         if self.reading.is_open() {
             self.reading.pause();
         }
@@ -59,7 +61,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
 
     fn resume(&mut self) {
         if self.reading.is_paused() {
-            trace!("resume");
+            trace!("resume {:?}", self.token);
             self.reading.resume();
         }
     }
@@ -113,7 +115,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
             loop {
                 //TODO: check if protocol paused
                 if self.reading.is_paused() {
-                    trace!("reading is paused");
+                    trace!("reading is paused {:?}", token);
                     break;
                 }
                 let mut buf = self.reading.close();
@@ -202,7 +204,7 @@ impl<P: Protocol, T: Transport> Stream<P, T> {
 
         if let Some(ref last) = self.last_action {
             if *last == action {
-                trace!("< Action is the same {:?}, Waiting", action);
+                trace!("< Action is the same {:?}, Waiting {:?}", action, self.token);
                 return Action::Wait
             }
         }

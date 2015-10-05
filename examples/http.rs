@@ -2,7 +2,7 @@ extern crate env_logger;
 extern crate mio;
 extern crate tick;
 
-struct Hello(tick::Transfer);
+struct Hello(tick::Transfer, tick::Id);
 
 impl tick::Protocol for Hello {
     fn on_data(&mut self, _data: &[u8]) {

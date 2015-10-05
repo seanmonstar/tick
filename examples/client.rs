@@ -4,7 +4,7 @@ extern crate tick;
 
 use std::io::{Write, stdout};
 
-struct Client(tick::Transfer);
+struct Client(tick::Transfer, tick::Id);
 
 impl tick::Protocol for Client {
     fn on_data(&mut self, data: &[u8]) {

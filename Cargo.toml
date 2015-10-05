@@ -8,6 +8,7 @@ repository = "https://github.com/seanmonstar/tick"
 
 [dependencies]
 mio = { git = "https://github.com/carllerche/mio" }
+slab = "0.1"
 log = "0.3"
 
 [dev-dependencies]

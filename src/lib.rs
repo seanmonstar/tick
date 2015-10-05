@@ -25,6 +25,7 @@
 
 #[macro_use] extern crate log;
 extern crate mio;
+extern crate slab;
 
 pub use tick::{Tick, Notify};
 pub use protocol::Protocol;
@@ -88,5 +89,24 @@ impl From<::std::io::Error> for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Opaque ID returned when adding listeners and streams to the loop.
-#[derive(Debug)]
+#[derive(Clone, Copy)]
 pub struct Id(::mio::Token);
+
+impl ::std::fmt::Debug for Id {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        f.debug_tuple("Id")
+            .field(&(self.0).0)
+            .finish()
+    }
+}
+
+
+impl slab::Index for Id {
+    fn from_usize(i: usize) -> Id {
+        Id(::mio::Token(i))
+    }
+
+    fn as_usize(&self) -> usize {
+        (self.0).0
+    }
+}

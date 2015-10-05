@@ -20,11 +20,11 @@ pub enum Evented<P: Protocol, T: Transport> {
     Stream(Stream<P, T>),
 }
 
-impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
+impl<F: Fn(::Transfer, ::Id) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
 
-    pub fn new(factory: F) -> LoopHandler<F, P, T> {
+    pub fn new(factory: F, size: usize) -> LoopHandler<F, P, T> {
         LoopHandler {
-            transports: mio::util::Slab::new(1024 * 8),
+            transports: mio::util::Slab::new(size),
             factory: factory,
         }
     }
@@ -54,8 +54,8 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
             let (tx, rx) = mpsc::channel();
             let is_queued = Arc::new(AtomicBool::new(false));
             let transfer = transfer::new(token, notify, tx, is_queued.clone());
-            let proto = factory(transfer);
-            Evented::Stream(Stream::new(transport, proto, rx, is_queued))
+            let proto = factory(transfer, ::Id(token));
+            Evented::Stream(Stream::new(token, transport, proto, rx, is_queued))
         });
         let token = match maybe_token {
             Some(token) => token,
@@ -147,7 +147,7 @@ enum Ready<T: Transport> {
     Action(Token, Action)
 }
 
-impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> mio::Handler for LoopHandler<F, P, T> {
+impl<F: Fn(::Transfer, ::Id) -> P, P: Protocol, T: Transport> mio::Handler for LoopHandler<F, P, T> {
     type Message = Message_;
     type Timeout = Thunk;
     fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
@@ -180,7 +180,7 @@ impl<F: Fn(::Transfer) -> P, P: Protocol, T: Transport> mio::Handler for LoopHan
         }
     }
 
-    fn timeout(&mut self, event_loop: &mut EventLoop<Self>, mut cb: Thunk) {
+    fn timeout(&mut self, _: &mut EventLoop<Self>, mut cb: Thunk) {
         debug!("< Timeout");
         cb();
     }

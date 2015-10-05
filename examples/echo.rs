@@ -2,7 +2,7 @@ extern crate env_logger;
 extern crate mio;
 extern crate tick;
 
-struct Echo(tick::Transfer);
+struct Echo(tick::Transfer, tick::Id);
 
 impl tick::Protocol for Echo {
     fn on_data(&mut self, data: &[u8]) {
