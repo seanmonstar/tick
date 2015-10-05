@@ -89,7 +89,7 @@ impl From<::std::io::Error> for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Opaque ID returned when adding listeners and streams to the loop.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id(::mio::Token);
 
 impl ::std::fmt::Debug for Id {
