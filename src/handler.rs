@@ -5,13 +5,13 @@ use mio::{self, EventLoop, Token, EventSet, PollOpt, TryAccept};
 
 use stream::Stream;
 use transfer;
-use ::{Action, Message, Protocol, Transport};
+use ::{Action, Message, Protocol, ProtocolFactory, Transport};
 
 pub type Message_ = Message;
 pub type Thunk = Box<FnMut() + Send + 'static>;
 
-pub struct LoopHandler<F, P: Protocol, T: Transport> {
-    pub transports: mio::util::Slab<Evented<P, T>>,
+pub struct LoopHandler<F: ProtocolFactory,  T: Transport> {
+    pub transports: mio::util::Slab<Evented<F::Proto, T>>,
     factory: F,
 }
 
@@ -20,9 +20,9 @@ pub enum Evented<P: Protocol, T: Transport> {
     Stream(Stream<P, T>),
 }
 
-impl<F: Fn(::Transfer, ::Id) -> P, P: Protocol, T: Transport> LoopHandler<F, P, T> {
+impl<F: ProtocolFactory, T: Transport> LoopHandler<F, T> {
 
-    pub fn new(factory: F, size: usize) -> LoopHandler<F, P, T> {
+    pub fn new(factory: F, size: usize) -> LoopHandler<F, T> {
         LoopHandler {
             transports: mio::util::Slab::new(size),
             factory: factory,
@@ -46,15 +46,15 @@ impl<F: Fn(::Transfer, ::Id) -> P, P: Protocol, T: Transport> LoopHandler<F, P, 
         }
     }
 
-    pub fn stream(&mut self, event_loop: &mut EventLoop<Self>, transport: T) -> ::Result<Token> {
+    pub fn stream(&mut self, event_loop: &mut EventLoop<Self>, transport: T, events: EventSet) -> ::Result<Token> {
         let notify = event_loop.channel();
-        let factory = &self.factory;
+        let factory = &mut self.factory;
         let maybe_token = self.transports.insert_with(move |token| {
             trace!("inserting new stream {:?}", token);
             let (tx, rx) = mpsc::channel();
             let is_queued = Arc::new(AtomicBool::new(false));
             let transfer = transfer::new(token, notify, tx, is_queued.clone());
-            let proto = factory(transfer, ::Id(token));
+            let proto = factory.create(transfer, ::Id(token));
             Evented::Stream(Stream::new(token, transport, proto, rx, is_queued))
         });
         let token = match maybe_token {
@@ -66,11 +66,11 @@ impl<F: Fn(::Transfer, ::Id) -> P, P: Protocol, T: Transport> LoopHandler<F, P, 
         };
         match self.transports.get(token) {
             Some(&Evented::Stream(ref stream)) => {
-                trace!("registering initial Readable for {:?}", token);
+                trace!("registering initial '{:?}' for {:?}", events, token);
                 try!(event_loop.register(
                     stream.transport(),
                     token,
-                    EventSet::readable(),
+                    events,
                     PollOpt::edge() | PollOpt::oneshot()
                 ));
                 Ok(token)
@@ -147,7 +147,7 @@ enum Ready<T: Transport> {
     Action(Token, Action)
 }
 
-impl<F: Fn(::Transfer, ::Id) -> P, P: Protocol, T: Transport> mio::Handler for LoopHandler<F, P, T> {
+impl<F: ProtocolFactory, T: Transport> mio::Handler for LoopHandler<F, T> {
     type Message = Message_;
     type Timeout = Thunk;
     fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
@@ -175,7 +175,7 @@ impl<F: Fn(::Transfer, ::Id) -> P, P: Protocol, T: Transport> mio::Handler for L
                 self.action(event_loop, token, action);
             },
             Ready::Insert(transport) => {
-                let _ = self.stream(event_loop, transport);
+                let _ = self.stream(event_loop, transport, EventSet::readable());
             }
         }
     }

@@ -1,15 +1,15 @@
 use std::time::Duration;
 
-use mio::{EventLoop, EventLoopConfig};
+use mio::{EventLoop, EventLoopConfig, EventSet};
 
 use handler::LoopHandler;
 use transport::Transport;
-use ::{Message, Protocol};
+use ::{Message, Protocol, ProtocolFactory};
 
 
-pub struct Tick<T: Transport, F: Fn(::Transfer, ::Id) -> P, P: Protocol> {
-    handler: LoopHandler<F, P, T>,
-    event_loop: EventLoop<LoopHandler<F, P, T>>
+pub struct Tick<T: Transport, F: ProtocolFactory> {
+    handler: LoopHandler<F, T>,
+    event_loop: EventLoop<LoopHandler<F, T>>
 }
 
 pub struct TickConfig {
@@ -26,12 +26,12 @@ impl TickConfig {
     }
 }
 
-impl<T: Transport, F: Fn(::Transfer, ::Id) -> P, P: Protocol> Tick<T, F, P> {
-    pub fn new(protocol_factory: F) -> Tick<T, F, P> {
+impl<T: Transport, F: ProtocolFactory> Tick<T, F> {
+    pub fn new(protocol_factory: F) -> Tick<T, F> {
         Tick::configured(protocol_factory, TickConfig::new())
     }
 
-    pub fn configured(factory: F, config: TickConfig) -> Tick<T, F, P> {
+    pub fn configured(factory: F, config: TickConfig) -> Tick<T, F> {
         let mut loop_config = EventLoopConfig::new();
         loop_config.notify_capacity(config.notify_capacity);
         Tick {
@@ -49,7 +49,7 @@ impl<T: Transport, F: Fn(::Transfer, ::Id) -> P, P: Protocol> Tick<T, F, P> {
     }
 
     pub fn stream(&mut self, transport: T) -> ::Result<::Id> {
-        self.handler.stream(&mut self.event_loop, transport).map(::Id)
+        self.handler.stream(&mut self.event_loop, transport, EventSet::writable()).map(::Id)
     }
 
     pub fn run_until_complete(&mut self, id: ::Id) -> ::Result<()> {

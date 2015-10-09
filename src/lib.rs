@@ -29,6 +29,7 @@ extern crate slab;
 
 pub use tick::{Tick, Notify};
 pub use protocol::Protocol;
+pub use protocol::Factory as ProtocolFactory;
 pub use transfer::Transfer;
 pub use transport::Transport;
 
