@@ -4,10 +4,10 @@ use mio::{EventLoop, EventLoopConfig, EventSet};
 
 use handler::LoopHandler;
 use transport::Transport;
-use ::{Message, Protocol, ProtocolFactory};
+use ::{Message, ProtocolFactory};
 
 
-pub struct Tick<T: Transport, F: ProtocolFactory> {
+pub struct Tick<T: Transport, F: ProtocolFactory<T>> {
     handler: LoopHandler<F, T>,
     event_loop: EventLoop<LoopHandler<F, T>>
 }
@@ -26,7 +26,7 @@ impl TickConfig {
     }
 }
 
-impl<T: Transport, F: ProtocolFactory> Tick<T, F> {
+impl<T: Transport, F: ProtocolFactory<T>> Tick<T, F> {
     pub fn new(protocol_factory: F) -> Tick<T, F> {
         Tick::configured(protocol_factory, TickConfig::new())
     }

@@ -2,25 +2,67 @@ extern crate env_logger;
 extern crate mio;
 extern crate tick;
 
-struct Hello(tick::Transfer, tick::Id);
+use std::io::{self, Read, Write};
 
-impl tick::Protocol for Hello {
-    fn on_data(&mut self, _data: &[u8]) {
+struct Hello {
+    msg: &'static [u8],
+    pos: usize,
+    eof: bool,
+}
+
+impl Hello {
+    fn new() -> Hello {
+        Hello {
+            msg: b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello",
+            pos: 0,
+            eof: false
+        }
+    }
+}
+
+type Tcp = mio::tcp::TcpStream;
+
+impl tick::Protocol<Tcp> for Hello {
+    fn interest(&self) -> tick::Interest {
+        if self.pos >= self.msg.len() {
+            tick::Interest::Remove
+        } else if self.eof {
+            tick::Interest::Write
+        } else {
+            tick::Interest::ReadWrite
+        }
+    }
+
+    fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<()> {
         // should check data for proper http semantics, but oh well
-        self.0.write(b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello");
+        let mut buf = [0; 1024];
+        while !self.eof {
+            let n = try!(transport.read(&mut buf));
+            if n == 0 {
+                self.eof = true;
+            }
+        }
+        Ok(())
     }
 
-
-    fn on_end(&mut self, err: Option<tick::Error>) {
-        println!("connection closing {:?}", err);
+    fn on_writable(&mut self, transport: &mut Tcp) -> io::Result<()> {
+        while self.pos < self.msg.len() {
+            self.pos += try!(transport.write(&self.msg[self.pos..]));
+        }
+        if !self.eof {
+            self.pos = 0;
+        }
+        Ok(())
     }
 
+    fn on_error(&mut self, err: tick::Error) {
+        panic!(err)
+    }
 }
 
 fn main() {
     env_logger::init().unwrap();
-    let mut tick = tick::Tick::<mio::tcp::TcpStream, _, _>::new(Hello);
-
+    let mut tick = tick::Tick::<Tcp, _>::new(|_, _| Hello::new());
     let sock = mio::tcp::TcpListener::bind(&"127.0.0.1:3330".parse().unwrap()).unwrap();
     tick.accept(sock).unwrap();
     println!("Listening on 127.0.0.1:3330");

@@ -28,7 +28,7 @@ extern crate mio;
 extern crate slab;
 
 pub use tick::{Tick, Notify};
-pub use protocol::Protocol;
+pub use protocol::{Protocol, Interest};
 pub use protocol::Factory as ProtocolFactory;
 pub use transfer::Transfer;
 pub use transport::Transport;
@@ -40,37 +40,14 @@ mod tick;
 mod transfer;
 mod transport;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum Action {
-    Wait,
     Register(mio::EventSet),
-    Queued,
     Remove,
-}
-
-#[derive(Clone, PartialEq)]
-enum Queued {
-    Resume,
-    Pause,
-    Write(Option<Vec<u8>>),
-    Close,
-}
-
-impl ::std::fmt::Debug for Queued {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match *self {
-            Queued::Resume => f.write_str("Queued::Resume"),
-            Queued::Pause => f.write_str("Queued::Pause"),
-            Queued::Write(Some(ref data)) => write!(f, "Queued::Write(Bytes({}))", data.len()),
-            Queued::Write(None) => f.write_str("Queued::Write(Eof)"),
-            Queued::Close => f.write_str("Queued::Close"),
-        }
-    }
 }
 
 enum Message {
     Timeout(Box<FnMut() + Send + 'static>, u64),
-    Action(mio::Token, Action),
     Shutdown,
 }
 
