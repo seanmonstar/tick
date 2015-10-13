@@ -4,7 +4,7 @@ use mio::{EventLoop, EventLoopConfig, Evented, EventSet, TryAccept};
 
 use handler::LoopHandler;
 use transport::Transport;
-use ::{Message, Protocol, ProtocolFactory};
+use ::{Message, ProtocolFactory};
 
 
 pub struct Tick<T: TryAccept + Evented, F: ProtocolFactory> where <T as TryAccept>::Output: Transport{

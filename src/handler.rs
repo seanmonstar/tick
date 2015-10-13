@@ -1,6 +1,3 @@
-use std::sync::{mpsc, Arc};
-use std::sync::atomic::AtomicBool;
-
 use mio::{self, EventLoop, Token, EventSet, PollOpt, TryAccept};
 
 use stream::Stream;
@@ -21,7 +18,6 @@ pub enum Evented<P: Protocol, T: TryAccept + mio::Evented> where <T as TryAccept
 }
 
 impl<F: ProtocolFactory, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T as TryAccept>::Output: Transport {
-
     pub fn new(factory: F, size: usize) -> LoopHandler<F, T> {
         LoopHandler {
             transports: mio::util::Slab::new(size),
@@ -51,11 +47,9 @@ impl<F: ProtocolFactory, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T
         let factory = &mut self.factory;
         let maybe_token = self.transports.insert_with(move |token| {
             trace!("inserting new stream {:?}", token);
-            let (tx, rx) = mpsc::channel();
-            let is_queued = Arc::new(AtomicBool::new(false));
-            let transfer = transfer::new(token, notify, tx, is_queued.clone());
+            let transfer = transfer::new(token, notify);
             let proto = factory.create(transfer, ::Id(token));
-            Evented::Stream(Stream::new(token, transport, proto, rx, is_queued))
+            Evented::Stream(Stream::new(token, transport, proto))
         });
         let token = match maybe_token {
             Some(token) => token,
@@ -80,27 +74,7 @@ impl<F: ProtocolFactory, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T
     }
 
     fn action(&mut self, event_loop: &mut EventLoop<Self>, token: Token, action: Action) {
-        let next = match action {
-            Action::Wait => {
-                debug!("  Action::Wait {:?}", token);
-                return;
-            }
-            Action::Queued => {
-                match self.transports.get_mut(token) {
-                    Some(&mut Evented::Stream(ref mut stream)) => {
-                        debug!("  Action::Queued {:?}", token);
-                        stream.queued()
-                    }
-                    Some(_) => {
-                        error!("cannot queue on listeners");
-                        return;
-                    }
-                    None => {
-                        warn!("  Action::Queued unknown token {:?}", token);
-                        return;
-                    }
-                }
-            }
+        match action {
             Action::Register(events) => {
                 match self.transports.get_mut(token) {
                     Some(&mut Evented::Stream(ref mut stream)) => {
@@ -111,15 +85,12 @@ impl<F: ProtocolFactory, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T
                             events,
                             PollOpt::edge() | PollOpt::oneshot()
                         );
-                        return;
                     }
                     Some(_) => {
                         error!("cannot register listeners");
-                        return;
                     }
                     None => {
                         error!("  Action::Register unknown token {:?}, '{:?}'", token, events);
-                        return;
                     }
                 }
             }
@@ -135,10 +106,8 @@ impl<F: ProtocolFactory, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T
                         }
                     }
                 }
-                return;
             }
         };
-        self.action(event_loop, token, next);
     }
 }
 
@@ -190,10 +159,6 @@ impl<F: ProtocolFactory, T: TryAccept + mio::Evented> mio::Handler for LoopHandl
             Message::Timeout(cb, when) => {
                 debug!("< Notify Message::Timeout {}ms", when);
                 event_loop.timeout_ms(cb, when);
-            }
-            Message::Action(token, action) => {
-                debug!("< Notify Message::Action {:?}", token);
-                self.action(event_loop, token, action);
             }
             Message::Shutdown => {
                 debug!("< Notify Message::Shutdown");
