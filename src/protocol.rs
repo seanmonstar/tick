@@ -46,7 +46,7 @@ pub trait Protocol {
 }
 */
 
-pub trait Factory<T> {
+pub trait Factory<T: Transport> {
     type Proto: Protocol<T>;
     fn create(&mut self, ::Transfer, ::Id) -> Self::Proto;
 }
