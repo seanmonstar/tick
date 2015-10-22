@@ -1,13 +1,13 @@
 use std::time::Duration;
 
-use mio::{EventLoop, EventLoopConfig, EventSet};
+use mio::{EventLoop, EventLoopConfig, Evented, EventSet, TryAccept};
 
 use handler::LoopHandler;
 use transport::Transport;
 use ::{Message, Protocol, ProtocolFactory};
 
 
-pub struct Tick<T: Transport, F: ProtocolFactory> {
+pub struct Tick<T: TryAccept + Evented, F: ProtocolFactory> where <T as TryAccept>::Output: Transport{
     handler: LoopHandler<F, T>,
     event_loop: EventLoop<LoopHandler<F, T>>
 }
@@ -26,7 +26,7 @@ impl TickConfig {
     }
 }
 
-impl<T: Transport, F: ProtocolFactory> Tick<T, F> {
+impl<T: TryAccept + Evented, F: ProtocolFactory> Tick<T, F> where <T as TryAccept>::Output: Transport {
     pub fn new(protocol_factory: F) -> Tick<T, F> {
         Tick::configured(protocol_factory, TickConfig::new())
     }
@@ -44,11 +44,11 @@ impl<T: Transport, F: ProtocolFactory> Tick<T, F> {
         Notify { sender: self.event_loop.channel() }
     }
 
-    pub fn accept(&mut self, listener: T::Listener) -> ::Result<::Id> {
+    pub fn accept(&mut self, listener: T) -> ::Result<::Id> {
         self.handler.listener(&mut self.event_loop, listener).map(::Id)
     }
 
-    pub fn stream(&mut self, transport: T) -> ::Result<::Id> {
+    pub fn stream(&mut self, transport: T::Output) -> ::Result<::Id> {
         self.handler.stream(&mut self.event_loop, transport, EventSet::writable()).map(::Id)
     }
 

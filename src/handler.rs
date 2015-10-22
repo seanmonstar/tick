@@ -10,17 +10,17 @@ use ::{Action, Message, Protocol, ProtocolFactory, Transport};
 pub type Message_ = Message;
 pub type Thunk = Box<FnMut() + Send + 'static>;
 
-pub struct LoopHandler<F: ProtocolFactory,  T: Transport> {
-    pub transports: mio::util::Slab<Evented<F::Proto, T>>,
+pub struct LoopHandler<F: ProtocolFactory,  T: TryAccept + mio::Evented> where <T as TryAccept>::Output: Transport {
+    pub transports: mio::util::Slab<Evented<F::Protocol, T>>,
     factory: F,
 }
 
-pub enum Evented<P: Protocol, T: Transport> {
-    Listener(T::Listener),
-    Stream(Stream<P, T>),
+pub enum Evented<P: Protocol, T: TryAccept + mio::Evented> where <T as TryAccept>::Output: Transport {
+    Listener(T),
+    Stream(Stream<P, T::Output>),
 }
 
-impl<F: ProtocolFactory, T: Transport> LoopHandler<F, T> {
+impl<F: ProtocolFactory, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T as TryAccept>::Output: Transport {
 
     pub fn new(factory: F, size: usize) -> LoopHandler<F, T> {
         LoopHandler {
@@ -29,7 +29,7 @@ impl<F: ProtocolFactory, T: Transport> LoopHandler<F, T> {
         }
     }
 
-    pub fn listener(&mut self, event_loop: &mut EventLoop<Self>, lis: T::Listener) -> ::Result<Token> {
+    pub fn listener(&mut self, event_loop: &mut EventLoop<Self>, lis: T) -> ::Result<Token> {
         let token = try!(self.transports.insert(Evented::Listener(lis))
                          .map_err(|_| ::Error::TooManySockets));
         match self.transports.get(token) {
@@ -46,7 +46,7 @@ impl<F: ProtocolFactory, T: Transport> LoopHandler<F, T> {
         }
     }
 
-    pub fn stream(&mut self, event_loop: &mut EventLoop<Self>, transport: T, events: EventSet) -> ::Result<Token> {
+    pub fn stream(&mut self, event_loop: &mut EventLoop<Self>, transport: T::Output, events: EventSet) -> ::Result<Token> {
         let notify = event_loop.channel();
         let factory = &mut self.factory;
         let maybe_token = self.transports.insert_with(move |token| {
@@ -147,7 +147,7 @@ enum Ready<T: Transport> {
     Action(Token, Action)
 }
 
-impl<F: ProtocolFactory, T: Transport> mio::Handler for LoopHandler<F, T> {
+impl<F: ProtocolFactory, T: TryAccept + mio::Evented> mio::Handler for LoopHandler<F, T> where <T as TryAccept>::Output: Transport {
     type Message = Message_;
     type Timeout = Thunk;
     fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
@@ -203,6 +203,6 @@ impl<F: ProtocolFactory, T: Transport> mio::Handler for LoopHandler<F, T> {
     }
 
     fn tick(&mut self, _event_loop: &mut EventLoop<Self>) {
-    
+        trace!("tick");
     }
 }

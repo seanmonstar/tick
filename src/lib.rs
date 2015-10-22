@@ -27,6 +27,7 @@
 extern crate mio;
 extern crate slab;
 
+pub use mio::Evented;
 pub use tick::{Tick, Notify};
 pub use protocol::Protocol;
 pub use protocol::Factory as ProtocolFactory;

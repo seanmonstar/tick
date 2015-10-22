@@ -1,15 +1,8 @@
 use std::io;
 
-use mio::{Evented, TryAccept};
+use ::Evented;
 
-pub trait Transport: Evented + io::Read + io::Write + Sized {
-    type Listener: Evented + TryAccept<Output=Self>;
-}
+pub trait Transport: Evented + io::Read + io::Write {}
 
+impl<T> Transport for T where T: Evented + io::Read + io::Write {}
 
-// implementations of Transports
-
-use mio::tcp::{TcpStream, TcpListener};
-impl Transport for TcpStream {
-    type Listener = TcpListener;
-}

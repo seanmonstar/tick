@@ -21,12 +21,12 @@ pub trait Protocol {
 }
 
 pub trait Factory {
-    type Proto: Protocol;
-    fn create(&mut self, ::Transfer, ::Id) -> Self::Proto;
+    type Protocol: Protocol;
+    fn create(&mut self, ::Transfer, ::Id) -> Self::Protocol;
 }
 
 impl<F, P> Factory for F where F: FnMut(::Transfer, ::Id) -> P, P: Protocol {
-    type Proto = P;
+    type Protocol = P;
     fn create(&mut self, transfer: ::Transfer, id: ::Id) -> P {
         self(transfer, id)
     }
