@@ -7,17 +7,17 @@ use ::{Action, Message, Protocol, ProtocolFactory, Transport};
 pub type Message_ = Message;
 pub type Thunk = Box<FnMut() + Send + 'static>;
 
-pub struct LoopHandler<F: ProtocolFactory,  T: TryAccept + mio::Evented> where <T as TryAccept>::Output: Transport {
+pub struct LoopHandler<F: ProtocolFactory<T::Output>,  T: TryAccept + mio::Evented> where <T as TryAccept>::Output: Transport {
     pub transports: mio::util::Slab<Evented<F::Protocol, T>>,
     factory: F,
 }
 
-pub enum Evented<P: Protocol, T: TryAccept + mio::Evented> where <T as TryAccept>::Output: Transport {
+pub enum Evented<P: Protocol<T::Output>, T: TryAccept + mio::Evented> where <T as TryAccept>::Output: Transport {
     Listener(T),
     Stream(Stream<P, T::Output>),
 }
 
-impl<F: ProtocolFactory, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T as TryAccept>::Output: Transport {
+impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T as TryAccept>::Output: Transport {
     pub fn new(factory: F, size: usize) -> LoopHandler<F, T> {
         LoopHandler {
             transports: mio::util::Slab::new(size),
@@ -48,8 +48,8 @@ impl<F: ProtocolFactory, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T
         let maybe_token = self.transports.insert_with(move |token| {
             trace!("inserting new stream {:?}", token);
             let transfer = transfer::new(token, notify);
-            let proto = factory.create(transfer, ::Id(token));
-            Evented::Stream(Stream::new(token, transport, proto))
+            let (proto, interest) = factory.create(transfer, ::Id(token));
+            Evented::Stream(Stream::new(token, transport, proto, interest))
         });
         let token = match maybe_token {
             Some(token) => token,
@@ -94,6 +94,7 @@ impl<F: ProtocolFactory, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T
                     }
                 }
             }
+            Action::Wait => debug!("  Action::Wait {:?}", token),
             Action::Remove => {
                 debug!("  Action::remove {:?}", token);
                 if let Some(slot) = self.transports.remove(token) {
@@ -103,6 +104,7 @@ impl<F: ProtocolFactory, T: TryAccept + mio::Evented> LoopHandler<F, T> where <T
                         }
                         Evented::Stream(stream) => {
                             let _ = event_loop.deregister(stream.transport());
+                            stream.removed();
                         }
                     }
                 }
@@ -116,7 +118,7 @@ enum Ready<T: Transport> {
     Action(Token, Action)
 }
 
-impl<F: ProtocolFactory, T: TryAccept + mio::Evented> mio::Handler for LoopHandler<F, T> where <T as TryAccept>::Output: Transport {
+impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> mio::Handler for LoopHandler<F, T> where <T as TryAccept>::Output: Transport {
     type Message = Message_;
     type Timeout = Thunk;
     fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
@@ -131,7 +133,7 @@ impl<F: ProtocolFactory, T: TryAccept + mio::Evented> mio::Handler for LoopHandl
             },
             Some(&mut Evented::Stream(ref mut stream)) => {
                 stream.ready(token, events);
-                Ready::Action(token, stream.action())
+                Ready::Action(token, stream.interest().into())
             }
             None => {
                 error!("unknown token ready {:?}", token);
@@ -156,6 +158,19 @@ impl<F: ProtocolFactory, T: TryAccept + mio::Evented> mio::Handler for LoopHandl
 
     fn notify(&mut self, event_loop: &mut EventLoop<Self>, msg: Message) {
         match msg {
+            Message::Interest(token, interest) => {
+                debug!("< Notify Message::Interest {:?} {:?}", token, interest);
+                let action = match self.transports.get(token) {
+                    Some(&Evented::Stream(ref s)) => {
+                        (s.interest() + interest).into()
+                    }
+                    _ => {
+                        error!("unknown token interested {:?}", token);
+                        return;
+                    }
+                };
+                self.action(event_loop, token, action);
+            }
             Message::Timeout(cb, when) => {
                 debug!("< Notify Message::Timeout {}ms", when);
                 event_loop.timeout_ms(cb, when);

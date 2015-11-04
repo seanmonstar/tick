@@ -44,10 +44,12 @@ mod transport;
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Action {
     Register(mio::EventSet),
+    Wait,
     Remove,
 }
 
 enum Message {
+    Interest(mio::Token, Interest),
     Timeout(Box<FnMut() + Send + 'static>, u64),
     Shutdown,
 }

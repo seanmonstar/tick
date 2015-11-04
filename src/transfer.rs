@@ -10,6 +10,7 @@ pub struct Transfer {
     notify: mio::Sender<Message>,
 }
 
+#[inline]
 pub fn new(token: mio::Token, notify: mio::Sender<Message_>) -> Transfer {
     Transfer {
         token: token,
@@ -18,6 +19,12 @@ pub fn new(token: mio::Token, notify: mio::Sender<Message_>) -> Transfer {
 }
 
 impl Transfer {
+    #[inline]
+    pub fn interest(&self, interest: ::Interest) {
+        self.notify.send(Message::Interest(self.token, interest));
+    }
+
+    //pub fn timeout(&self, )
 }
 
 impl fmt::Debug for Transfer {
@@ -28,11 +35,3 @@ impl fmt::Debug for Transfer {
     }
 }
 
-/*
-impl Drop for Transfer {
-    fn drop(&mut self) {
-        trace!("Transfer::drop {:?}", self.token);
-        self.close();
-    }
-}
-*/

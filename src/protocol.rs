@@ -1,11 +1,15 @@
 use std::io;
 
-use ::Transport;
+use mio::EventSet;
+
+use ::{Action, Transport};
+
+pub type Action_ = Action;
 
 pub trait Protocol<T: Transport> {
-    fn interest(&self) -> Interest;
-    fn on_readable(&mut self, transport: &mut T) -> io::Result<()>;
-    fn on_writable(&mut self, transport: &mut T) -> io::Result<()>;
+    //fn interest(&self) -> Interest;
+    fn on_readable(&mut self, transport: &mut T) -> io::Result<Interest>;
+    fn on_writable(&mut self, transport: &mut T) -> io::Result<Interest>;
 
     fn on_error(&mut self, error: ::Error);
 
@@ -17,43 +21,65 @@ pub trait Protocol<T: Transport> {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Interest {
     Remove,
+    Wait,
     Read,
     Write,
     ReadWrite,
 }
 
-/*
-pub trait Protocol {
-    fn on_data(&mut self, data: &[u8]) {
-        trace!("ignored on_data({:?})", data);
-    }
+impl ::std::ops::Add for Interest {
+    type Output = Interest;
+    fn add(self, other: Interest) -> Interest {
+        match (self, other) {
+            (Interest::Read, Interest::Write) => Interest::ReadWrite,
+            (Interest::Read, Interest::ReadWrite) => Interest::ReadWrite,
 
-    fn on_eof(&mut self) {
-        trace!("ignored on_eof");
-    }
+            (Interest::Write, Interest::Read) => Interest::ReadWrite,
+            (Interest::Write, Interest::ReadWrite) => Interest::ReadWrite,
 
-    fn on_pause(&mut self) {
-        trace!("ignored on_pause");
-    }
+            (Interest::Wait, Interest::Read) => Interest::Read,
+            (Interest::Wait, Interest::Write) => Interest::Write,
+            (Interest::Wait, Interest::ReadWrite) => Interest::ReadWrite,
 
-    fn on_resume(&mut self) {
-        trace!("ignored on_resume");
-    }
-
-    fn on_end(&mut self, err: Option<::Error>) {
-        trace!("ignored on_end({:?})", err);
+            (_, Interest::Remove) => Interest::Remove,
+            _ => self
+        }
     }
 }
-*/
 
-pub trait Factory {
-    type Protocol: Protocol;
-    fn create(&mut self, ::Transfer, ::Id) -> Self::Protocol;
+impl ::std::ops::Sub for Interest {
+    type Output = Interest;
+    fn sub(self, other: Interest) -> Interest {
+        match (self, other) {
+            (Interest::ReadWrite, Interest::Write) => Interest::Read,
+            (Interest::ReadWrite, Interest::Read) => Interest::Write,
+            (_, Interest::Remove) => self,
+            (_, Interest::Wait) => self,
+            _ => Interest::Wait
+        }
+    }
 }
 
-impl<F, P> Factory for F where F: FnMut(::Transfer, ::Id) -> P, P: Protocol {
+impl Into<Action_> for Interest {
+    fn into(self) -> Action {
+        match self {
+            Interest::Read => Action::Register(EventSet::readable()),
+            Interest::Write => Action::Register(EventSet::writable()),
+            Interest::ReadWrite => Action::Register(EventSet::readable() | EventSet::writable()),
+            Interest::Wait => Action::Wait,
+            Interest::Remove => Action::Remove
+        }
+    }
+}
+
+pub trait Factory<T: Transport> {
+    type Protocol: Protocol<T>;
+    fn create(&mut self, ::Transfer, ::Id) -> (Self::Protocol, Interest);
+}
+
+impl<F, P, T> Factory<T> for F where F: FnMut(::Transfer, ::Id) -> (P, Interest), P: Protocol<T>, T: Transport {
     type Protocol = P;
-    fn create(&mut self, transfer: ::Transfer, id: ::Id) -> P {
+    fn create(&mut self, transfer: ::Transfer, id: ::Id) -> (P, Interest) {
         self(transfer, id)
     }
 }

@@ -33,7 +33,7 @@ impl tick::Protocol<Tcp> for Hello {
         }
     }
 
-    fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<()> {
+    fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<Interest> {
         // should check data for proper http semantics, but oh well
         let mut buf = [0; 1024];
         while !self.eof {
@@ -42,21 +42,23 @@ impl tick::Protocol<Tcp> for Hello {
                 self.eof = true;
             }
         }
-        Ok(())
+        Ok(self.interest())
     }
 
-    fn on_writable(&mut self, transport: &mut Tcp) -> io::Result<()> {
+    fn on_writable(&mut self, transport: &mut Tcp) -> io::Result<Interest> {
         while self.pos < self.msg.len() {
             self.pos += try!(transport.write(&self.msg[self.pos..]));
         }
         if !self.eof {
             self.pos = 0;
         }
-        Ok(())
+        Ok(self.interest())
     }
 
     fn on_error(&mut self, err: tick::Error) {
-        panic!(err)
+        self.msg = b"";
+        self.pos = 0;
+        println!("on_error: {:?}");
     }
 }
 

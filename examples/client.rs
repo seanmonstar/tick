@@ -33,7 +33,7 @@ impl tick::Protocol<Tcp> for Client {
         }
     }
 
-    fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<()> {
+    fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<tick::Interest> {
         let mut buf = [0u8; 4096];
         loop {
             match transport.read(&mut buf) {
@@ -48,18 +48,19 @@ impl tick::Protocol<Tcp> for Client {
                 Err(e) => return Err(e)
             }
         }
-        Ok(())
+        Ok(self.interest())
     }
 
-    fn on_writable(&mut self, transport: &mut Tcp) -> io::Result<()> {
+    fn on_writable(&mut self, transport: &mut Tcp) -> io::Result<tick::Interest> {
         while self.pos < self.msg.len() {
             self.pos += try!(transport.write(&self.msg[self.pos..]));
         }
-        Ok(())
+        Ok(self.interest())
     }
 
     fn on_error(&mut self, err: tick::Error) {
-        panic!(err)
+        self.eof = true;
+        println!("on_error: {:?}", err);
     }
 }
 

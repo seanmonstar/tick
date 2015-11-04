@@ -7,7 +7,7 @@ use transport::Transport;
 use ::{Message, ProtocolFactory};
 
 
-pub struct Tick<T: TryAccept + Evented, F: ProtocolFactory> where <T as TryAccept>::Output: Transport{
+pub struct Tick<T: TryAccept + Evented, F: ProtocolFactory<T::Output>> where <T as TryAccept>::Output: Transport {
     handler: LoopHandler<F, T>,
     event_loop: EventLoop<LoopHandler<F, T>>
 }
@@ -26,7 +26,7 @@ impl TickConfig {
     }
 }
 
-impl<T: TryAccept + Evented, F: ProtocolFactory> Tick<T, F> where <T as TryAccept>::Output: Transport {
+impl<T: TryAccept + Evented, F: ProtocolFactory<T::Output>> Tick<T, F> where <T as TryAccept>::Output: Transport {
     pub fn new(protocol_factory: F) -> Tick<T, F> {
         Tick::configured(protocol_factory, TickConfig::new())
     }

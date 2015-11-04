@@ -25,24 +25,16 @@ impl tick::Protocol<Tcp> for Echo {
         }
     }
     fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<()> {
-        while self.read_pos < self.buf.len() {
-            match transport.read(&mut self.buf[self.read_pos..]) {
-                Ok(0) => {
-                    self.eof = true;
-                    return Ok(())
-                },
-                Ok(n) => self.read_pos += n,
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    break;
-                }
-                Err(e) => {
-                    self.eof = true;
-                    return Err(e);
-                }
+        if self.read_pos < self.buf.len() {
+            let n = try!(transport.read(&mut self.buf[self.read_pos..]));
+            if n == 0 {
+                self.eof = true;
+            } else {
+                self.read_pos += n;
             }
         }
 
-        Ok(())
+        Ok(self.interest())
     }
 
     fn on_writable(&mut self, transport: &mut Tcp) -> io::Result<()> {
@@ -51,15 +43,15 @@ impl tick::Protocol<Tcp> for Echo {
                 0 => panic!("write ZERO"),
                 n => self.write_pos += n,
             }
-            println!("left to write: {}", self.read_pos - self.write_pos);
         }
         self.read_pos = 0;
         self.write_pos = 0;
-        Ok(())
+        Ok(self.interest())
     }
 
     fn on_error(&mut self, e: tick::Error) {
-        panic!(e);
+        self.eof = true;
+        println!("on_error: {:?}", e);
     }
 }
 
