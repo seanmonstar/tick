@@ -65,7 +65,7 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> LoopHandler<F, 
                     stream.transport(),
                     token,
                     events,
-                    PollOpt::edge() | PollOpt::oneshot()
+                    PollOpt::level() | PollOpt::oneshot()
                 ));
                 Ok(token)
             },
@@ -83,7 +83,7 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> LoopHandler<F, 
                             stream.transport(),
                             token,
                             events,
-                            PollOpt::edge() | PollOpt::oneshot()
+                            PollOpt::level() | PollOpt::oneshot()
                         );
                     }
                     Some(_) => {

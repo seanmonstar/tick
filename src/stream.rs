@@ -79,7 +79,7 @@ impl<P: Protocol<T>, T: Transport> Stream<P, T> {
         self.interest
     }
 
-    pub fn remove(self) {
+    pub fn removed(self) {
         self.protocol.on_remove(self.transport);
     }
 }
