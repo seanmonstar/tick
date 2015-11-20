@@ -6,17 +6,15 @@ use ::{Interest, Protocol, Transport};
 pub struct Stream<P: Protocol<T>, T: Transport> {
     transport: T,
     protocol: P,
-    token: Token,
     interest: Interest,
 }
 
 impl<P: Protocol<T>, T: Transport> Stream<P, T> {
 
-    pub fn new(token: Token, transport: T, protocol: P, interest: Interest) -> Stream<P, T> {
+    pub fn new(transport: T, protocol: P, interest: Interest) -> Stream<P, T> {
         Stream {
             transport: transport,
             protocol: protocol,
-            token: token,
             interest: interest,
         }
     }
@@ -24,7 +22,9 @@ impl<P: Protocol<T>, T: Transport> Stream<P, T> {
     pub fn ready(&mut self, token: Token, events: EventSet) {
         trace!("ready {:?}, '{:?}'", token, events);
         if events.is_error() {
-            debug!("error event on {:?}", token);
+            error!("error event on {:?}", token);
+            self.interest = Interest::Remove;
+            return;
             //TODO: self.protocol.on_error(self.transport.error());
         }
 
@@ -41,8 +41,10 @@ impl<P: Protocol<T>, T: Transport> Stream<P, T> {
                         io::ErrorKind::WouldBlock => break,
                         io::ErrorKind::Interrupted => (),
                         _ => {
-                            trace!("on_readable {:?} {:?}", token, e);
-                            break;
+                            error!("on_readable {:?} {:?}", token, e);
+                            self.interest = Interest::Remove;
+                            self.protocol.on_error(e.into());
+                            return;
                         }
                     }
                 }
@@ -62,8 +64,10 @@ impl<P: Protocol<T>, T: Transport> Stream<P, T> {
                         io::ErrorKind::WouldBlock => break,
                         io::ErrorKind::Interrupted => (),
                         _ => {
-                            trace!("on_writable {:?} {:?}", token, e);
-                            break;
+                            error!("on_writable {:?} {:?}", token, e);
+                            self.interest = Interest::Remove;
+                            self.protocol.on_error(e.into());
+                            return;
                         }
                     }
                 }

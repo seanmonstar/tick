@@ -3,6 +3,7 @@ extern crate mio;
 extern crate tick;
 
 use std::io::{self, Read, Write};
+use tick::Interest;
 
 struct Hello {
     msg: &'static [u8],
@@ -18,11 +19,7 @@ impl Hello {
             eof: false
         }
     }
-}
 
-type Tcp = mio::tcp::TcpStream;
-
-impl tick::Protocol<Tcp> for Hello {
     fn interest(&self) -> tick::Interest {
         if self.pos >= self.msg.len() {
             tick::Interest::Remove
@@ -32,7 +29,11 @@ impl tick::Protocol<Tcp> for Hello {
             tick::Interest::ReadWrite
         }
     }
+}
 
+type Tcp = mio::tcp::TcpStream;
+
+impl tick::Protocol<Tcp> for Hello {
     fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<Interest> {
         // should check data for proper http semantics, but oh well
         let mut buf = [0; 1024];
@@ -58,13 +59,13 @@ impl tick::Protocol<Tcp> for Hello {
     fn on_error(&mut self, err: tick::Error) {
         self.msg = b"";
         self.pos = 0;
-        println!("on_error: {:?}");
+        println!("on_error: {:?}", err);
     }
 }
 
 fn main() {
     env_logger::init().unwrap();
-    let mut tick = tick::Tick::<Tcp, _>::new(|_, _| Hello::new());
+    let mut tick = tick::Tick::new(|_, _| (Hello::new(), Interest::ReadWrite));
     let sock = mio::tcp::TcpListener::bind(&"127.0.0.1:3330".parse().unwrap()).unwrap();
     tick.accept(sock).unwrap();
     println!("Listening on 127.0.0.1:3330");

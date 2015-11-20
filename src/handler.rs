@@ -49,7 +49,7 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> LoopHandler<F, 
             trace!("inserting new stream {:?}", token);
             let transfer = transfer::new(token, notify);
             let (proto, interest) = factory.create(transfer, ::Id(token));
-            Evented::Stream(Stream::new(token, transport, proto, interest))
+            Evented::Stream(Stream::new(transport, proto, interest))
         });
         let token = match maybe_token {
             Some(token) => token,
@@ -160,9 +160,18 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> mio::Handler fo
         match msg {
             Message::Interest(token, interest) => {
                 debug!("< Notify Message::Interest {:?} {:?}", token, interest);
-                let action = match self.transports.get(token) {
-                    Some(&Evented::Stream(ref s)) => {
-                        (s.interest() + interest).into()
+                let action = match self.transports.get_mut(token) {
+                    Some(&mut Evented::Stream(ref mut s)) => {
+                        let action = (s.interest() + interest).into();
+                        match action {
+                            Action::Register(events) => {
+                                // pretend these events are ready, incase the
+                                // socket wasn't drained before
+                                s.ready(token, events);
+                                s.interest().into()
+                            }
+                            _ => action
+                        }
                     }
                     _ => {
                         error!("unknown token interested {:?}", token);
