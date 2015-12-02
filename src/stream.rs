@@ -41,7 +41,6 @@ impl<P: Protocol<T>, T: Transport> Stream<P, T> {
                         io::ErrorKind::WouldBlock => break,
                         io::ErrorKind::Interrupted => (),
                         _ => {
-                            error!("on_readable {:?} {:?}", token, e);
                             self.interest = Interest::Remove;
                             self.protocol.on_error(e.into());
                             return;
@@ -64,7 +63,6 @@ impl<P: Protocol<T>, T: Transport> Stream<P, T> {
                         io::ErrorKind::WouldBlock => break,
                         io::ErrorKind::Interrupted => (),
                         _ => {
-                            error!("on_writable {:?} {:?}", token, e);
                             self.interest = Interest::Remove;
                             self.protocol.on_error(e.into());
                             return;

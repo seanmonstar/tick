@@ -90,7 +90,7 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> LoopHandler<F, 
                         error!("cannot register listeners");
                     }
                     None => {
-                        error!("  Action::Register unknown token {:?}, '{:?}'", token, events);
+                        warn!("  Action::Register unknown token {:?}, '{:?}'", token, events);
                     }
                 }
             }
@@ -136,7 +136,7 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> mio::Handler fo
                 Ready::Action(token, stream.interest().into())
             }
             None => {
-                error!("unknown token ready {:?}", token);
+                warn!("unknown token ready {:?}", token);
                 return;
             }
         };
@@ -174,7 +174,7 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> mio::Handler fo
                         }
                     }
                     _ => {
-                        error!("unknown token interested {:?}", token);
+                        warn!("unknown token interested {:?}", token);
                         return;
                     }
                 };
