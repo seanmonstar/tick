@@ -54,7 +54,7 @@ impl<T: TryAccept + Evented, F: ProtocolFactory<T::Output>> Tick<T, F> where <T 
 
     pub fn run_until_complete(&mut self, id: ::Id) -> ::Result<()> {
         while self.handler.transports.contains(id.0) {
-            try!(self.event_loop.run_once(&mut self.handler));
+            try!(self.event_loop.run_once(&mut self.handler, None));
         }
         Ok(())
     }

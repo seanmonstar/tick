@@ -7,7 +7,7 @@ license = "MIT"
 repository = "https://github.com/seanmonstar/tick"
 
 [dependencies]
-mio = { git = "https://github.com/carllerche/mio" }
+mio = "0.5"
 slab = "0.1"
 log = "0.3"
 
