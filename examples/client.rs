@@ -22,7 +22,7 @@ impl Client {
     }
 }
 
-impl tick::Protocol<Tcp> for Client {
+impl Client {
     fn interest(&self) -> tick::Interest {
         if self.eof {
             tick::Interest::Remove
@@ -32,7 +32,9 @@ impl tick::Protocol<Tcp> for Client {
             tick::Interest::Read
         }
     }
+}
 
+impl tick::Protocol<Tcp> for Client {
     fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<tick::Interest> {
         let mut buf = [0u8; 4096];
         loop {
@@ -66,7 +68,7 @@ impl tick::Protocol<Tcp> for Client {
 
 fn main() {
     env_logger::init().unwrap();
-    let mut tick = tick::Tick::<Tcp, _>::new(|_, _| Client::new());
+    let mut tick = tick::Tick::<mio::tcp::TcpListener, _>::new(|_, _| (Client::new(), tick::Interest::Write));
 
     let sock = mio::tcp::TcpStream::connect(&"127.0.0.1:1337".parse().unwrap()).unwrap();
     let id = tick.stream(sock).unwrap();
