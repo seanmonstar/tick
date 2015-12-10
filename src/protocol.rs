@@ -1,5 +1,3 @@
-use std::io;
-
 use mio::EventSet;
 
 use ::{Action, Transport};
@@ -7,9 +5,8 @@ use ::{Action, Transport};
 pub type Action_ = Action;
 
 pub trait Protocol<T: Transport> {
-    //fn interest(&self) -> Interest;
-    fn on_readable(&mut self, transport: &mut T) -> io::Result<Interest>;
-    fn on_writable(&mut self, transport: &mut T) -> io::Result<Interest>;
+    fn on_readable(&mut self, transport: &mut T) -> Interest;
+    fn on_writable(&mut self, transport: &mut T) -> Interest;
 
     fn on_error(&mut self, error: ::Error);
 
@@ -74,12 +71,12 @@ impl Into<Action_> for Interest {
 
 pub trait Factory<T: Transport> {
     type Protocol: Protocol<T>;
-    fn create(&mut self, ::Transfer, ::Id) -> (Self::Protocol, Interest);
+    fn create(&mut self, ::Transfer) -> (Self::Protocol, Interest);
 }
 
-impl<F, P, T> Factory<T> for F where F: FnMut(::Transfer, ::Id) -> (P, Interest), P: Protocol<T>, T: Transport {
+impl<F, P, T> Factory<T> for F where F: FnMut(::Transfer) -> (P, Interest), P: Protocol<T>, T: Transport {
     type Protocol = P;
-    fn create(&mut self, transfer: ::Transfer, id: ::Id) -> (P, Interest) {
-        self(transfer, id)
+    fn create(&mut self, transfer: ::Transfer) -> (P, Interest) {
+        self(transfer)
     }
 }

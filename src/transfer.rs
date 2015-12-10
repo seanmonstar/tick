@@ -20,8 +20,8 @@ pub fn new(token: mio::Token, notify: mio::Sender<Message_>) -> Transfer {
 
 impl Transfer {
     #[inline]
-    pub fn interest(&self, interest: ::Interest) {
-        self.notify.send(Message::Interest(self.token, interest));
+    pub fn interest(&self, interest: ::Interest) -> bool {
+        self.notify.send(Message::Interest(self.token, interest)).is_ok()
     }
 
     //pub fn timeout(&self, )

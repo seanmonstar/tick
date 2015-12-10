@@ -27,29 +27,41 @@ impl Echo {
 
 
 impl tick::Protocol<Tcp> for Echo {
-    fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<tick::Interest> {
+    fn on_readable(&mut self, transport: &mut Tcp) -> tick::Interest {
         if self.read_pos < self.buf.len() {
-            let n = try!(transport.read(&mut self.buf[self.read_pos..]));
-            if n == 0 {
-                self.eof = true;
-            } else {
-                self.read_pos += n;
+            match transport.read(&mut self.buf[self.read_pos..]) {
+                Ok(0) => self.eof = true,
+                Ok(n) => self.read_pos += n,
+                Err(e) => match e.kind() {
+                    io::ErrorKind::WouldBlock => {},
+                    _ => {
+                        println!("read error {:?}", e);
+                        return tick::Interest::Remove;
+                    }
+                }
             }
         }
 
-        Ok(self.interest())
+        self.interest()
     }
 
-    fn on_writable(&mut self, transport: &mut Tcp) -> io::Result<tick::Interest> {
+    fn on_writable(&mut self, transport: &mut Tcp) -> tick::Interest {
         while self.write_pos < self.read_pos {
-            match try!(transport.write(&self.buf[self.write_pos..self.read_pos])) {
-                0 => panic!("write ZERO"),
-                n => self.write_pos += n,
+            match transport.write(&self.buf[self.write_pos..self.read_pos]) {
+                Ok(0) => panic!("write ZERO"),
+                Ok(n) => self.write_pos += n,
+                Err(e) => match e.kind() {
+                    io::ErrorKind::WouldBlock => break,
+                    _ => {
+                        println!("write error {:?}", e);
+                        return tick::Interest::Remove;
+                    }
+                }
             }
         }
         self.read_pos = 0;
         self.write_pos = 0;
-        Ok(self.interest())
+        self.interest()
     }
 
     fn on_error(&mut self, e: tick::Error) {
@@ -60,7 +72,7 @@ impl tick::Protocol<Tcp> for Echo {
 
 fn main() {
     env_logger::init().unwrap();
-    let mut tick = tick::Tick::new(|_, _| (Echo {
+    let mut tick = tick::Tick::new(|_| (Echo {
         buf: vec![0; 4096],
         read_pos: 0,
         write_pos: 0,

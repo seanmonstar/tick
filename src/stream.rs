@@ -1,5 +1,3 @@
-use std::io;
-
 use mio::{Token, EventSet};
 use ::{Interest, Protocol, Transport};
 
@@ -30,46 +28,12 @@ impl<P: Protocol<T>, T: Transport> Stream<P, T> {
 
         if events.is_readable() {
             trace!("on_readable {:?} ->", token);
-            loop {
-                trace!("  on_readable loop");
-                match self.protocol.on_readable(&mut self.transport) {
-                    Ok(interest) => {
-                        self.interest = interest;
-                        break;
-                    },
-                    Err(e) => match e.kind() {
-                        io::ErrorKind::WouldBlock => break,
-                        io::ErrorKind::Interrupted => (),
-                        _ => {
-                            self.interest = Interest::Remove;
-                            self.protocol.on_error(e.into());
-                            return;
-                        }
-                    }
-                }
-            }
+            self.interest = self.protocol.on_readable(&mut self.transport);
         }
 
         if events.is_writable() {
             trace!("on_writable {:?} ->", token);
-            loop {
-                trace!("  on_writable loop");
-                match self.protocol.on_writable(&mut self.transport) {
-                    Ok(interest) => {
-                        self.interest = interest;
-                        break;
-                    },
-                    Err(e) => match e.kind() {
-                        io::ErrorKind::WouldBlock => break,
-                        io::ErrorKind::Interrupted => (),
-                        _ => {
-                            self.interest = Interest::Remove;
-                            self.protocol.on_error(e.into());
-                            return;
-                        }
-                    }
-                }
-            }
+            self.interest = self.protocol.on_writable(&mut self.transport);
         }
     }
 

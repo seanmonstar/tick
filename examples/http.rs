@@ -34,26 +34,43 @@ impl Hello {
 type Tcp = mio::tcp::TcpStream;
 
 impl tick::Protocol<Tcp> for Hello {
-    fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<Interest> {
+    fn on_readable(&mut self, transport: &mut Tcp) -> Interest {
         // should check data for proper http semantics, but oh well
         let mut buf = [0; 1024];
         while !self.eof {
-            let n = try!(transport.read(&mut buf));
-            if n == 0 {
-                self.eof = true;
+            match transport.read(&mut buf) {
+                Ok(0) => self.eof = true,
+                Ok(_) => {},
+                Err(e) => match e.kind() {
+                    io::ErrorKind::WouldBlock => break,
+                    _ => {
+                        println!("read error {:?}", e);
+                        return Interest::Remove;
+                    }
+                }
             }
         }
-        Ok(self.interest())
+        self.interest()
     }
 
-    fn on_writable(&mut self, transport: &mut Tcp) -> io::Result<Interest> {
+    fn on_writable(&mut self, transport: &mut Tcp) -> Interest {
         while self.pos < self.msg.len() {
-            self.pos += try!(transport.write(&self.msg[self.pos..]));
+            match transport.write(&self.msg[self.pos..]) {
+                Ok(0) => return Interest::Remove,
+                Ok(n) => self.pos += n,
+                Err(e) => match e.kind() {
+                    io::ErrorKind::WouldBlock => break,
+                    _ => {
+                        println!("write error {:?}", e);
+                        return Interest::Remove;
+                    }
+                }
+            }
         }
         if !self.eof {
             self.pos = 0;
         }
-        Ok(self.interest())
+        self.interest()
     }
 
     fn on_error(&mut self, err: tick::Error) {
@@ -65,7 +82,7 @@ impl tick::Protocol<Tcp> for Hello {
 
 fn main() {
     env_logger::init().unwrap();
-    let mut tick = tick::Tick::new(|_, _| (Hello::new(), Interest::ReadWrite));
+    let mut tick = tick::Tick::new(|_| (Hello::new(), Interest::ReadWrite));
     let sock = mio::tcp::TcpListener::bind(&"127.0.0.1:3330".parse().unwrap()).unwrap();
     tick.accept(sock).unwrap();
     println!("Listening on 127.0.0.1:3330");

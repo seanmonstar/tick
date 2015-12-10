@@ -35,7 +35,7 @@ impl Client {
 }
 
 impl tick::Protocol<Tcp> for Client {
-    fn on_readable(&mut self, transport: &mut Tcp) -> io::Result<tick::Interest> {
+    fn on_readable(&mut self, transport: &mut Tcp) -> tick::Interest {
         let mut buf = [0u8; 4096];
         loop {
             match transport.read(&mut buf) {
@@ -44,20 +44,29 @@ impl tick::Protocol<Tcp> for Client {
                     break;
                 }
                 Ok(n) => {
-                    try!(stdout().write_all(&buf[..n]));
+                    stdout().write_all(&buf[..n]).unwrap();
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => break,
-                Err(e) => return Err(e)
+                Err(_) => return tick::Interest::Remove,
             }
         }
-        Ok(self.interest())
+        self.interest()
     }
 
-    fn on_writable(&mut self, transport: &mut Tcp) -> io::Result<tick::Interest> {
+    fn on_writable(&mut self, transport: &mut Tcp) -> tick::Interest {
         while self.pos < self.msg.len() {
-            self.pos += try!(transport.write(&self.msg[self.pos..]));
+            match transport.write(&self.msg[self.pos..]) {
+                Ok(0) => return tick::Interest::Remove,
+                Ok(n) => self.pos += n,
+                Err(e) => match e.kind() {
+                    io::ErrorKind::WouldBlock => break,
+                    _ => {
+                        return tick::Interest::Remove;
+                    }
+                }
+            }
         }
-        Ok(self.interest())
+        self.interest()
     }
 
     fn on_error(&mut self, err: tick::Error) {
@@ -68,7 +77,7 @@ impl tick::Protocol<Tcp> for Client {
 
 fn main() {
     env_logger::init().unwrap();
-    let mut tick = tick::Tick::<mio::tcp::TcpListener, _>::new(|_, _| (Client::new(), tick::Interest::Write));
+    let mut tick = tick::Tick::<mio::tcp::TcpListener, _>::new(|_| (Client::new(), tick::Interest::Write));
 
     let sock = mio::tcp::TcpStream::connect(&"127.0.0.1:1337".parse().unwrap()).unwrap();
     let id = tick.stream(sock).unwrap();

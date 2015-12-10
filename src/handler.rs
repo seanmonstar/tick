@@ -48,7 +48,7 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> LoopHandler<F, 
         let maybe_token = self.transports.insert_with(move |token| {
             trace!("inserting new stream {:?}", token);
             let transfer = transfer::new(token, notify);
-            let (proto, interest) = factory.create(transfer, ::Id(token));
+            let (proto, interest) = factory.create(transfer);
             Evented::Stream(Stream::new(transport, proto, interest))
         });
         let token = match maybe_token {
