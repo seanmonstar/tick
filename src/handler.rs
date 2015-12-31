@@ -2,7 +2,7 @@ use mio::{self, EventLoop, Token, EventSet, PollOpt, TryAccept};
 
 use stream::Stream;
 use transfer;
-use ::{Action, Message, Protocol, ProtocolFactory, Transport};
+use ::{Action, Interest, Message, Protocol, ProtocolFactory, Transport};
 
 pub type Message_ = Message;
 pub type Thunk = Box<FnMut() + Send + 'static>;
@@ -42,7 +42,7 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> LoopHandler<F, 
         }
     }
 
-    pub fn stream(&mut self, event_loop: &mut EventLoop<Self>, transport: T::Output, events: EventSet) -> ::Result<Token> {
+    pub fn stream(&mut self, event_loop: &mut EventLoop<Self>, transport: T::Output) -> ::Result<Token> {
         let notify = event_loop.channel();
         let factory = &mut self.factory;
         let maybe_token = self.transports.insert_with(move |token| {
@@ -60,6 +60,12 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> LoopHandler<F, 
         };
         match self.transports.get(token) {
             Some(&Evented::Stream(ref stream)) => {
+                let events = match stream.interest() {
+                    Interest::Read => EventSet::readable(),
+                    Interest::Write => EventSet::writable(),
+                    Interest::ReadWrite => EventSet::readable() | EventSet::writable(),
+                    i => panic!("Illegal initial interest {:?}", i),
+                };
                 trace!("registering initial '{:?}' for {:?}", events, token);
                 try!(event_loop.register(
                     stream.transport(),
@@ -146,7 +152,7 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> mio::Handler fo
                 self.action(event_loop, token, action);
             },
             Ready::Insert(transport) => {
-                let _ = self.stream(event_loop, transport, EventSet::readable());
+                let _ = self.stream(event_loop, transport);
             }
         }
     }
