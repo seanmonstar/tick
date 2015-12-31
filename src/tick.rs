@@ -49,7 +49,7 @@ impl<T: TryAccept + Evented, F: ProtocolFactory<T::Output>> Tick<T, F> where <T 
     }
 
     pub fn stream(&mut self, transport: T::Output) -> ::Result<::Id> {
-        self.handler.stream(&mut self.event_loop, transport, EventSet::writable()).map(::Id)
+        self.handler.stream(&mut self.event_loop, transport).map(::Id)
     }
 
     pub fn run_until_complete(&mut self, id: ::Id) -> ::Result<()> {
