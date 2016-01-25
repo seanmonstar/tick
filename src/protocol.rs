@@ -1,8 +1,8 @@
 use mio::EventSet;
 
-use ::{Action, Transport};
+use ::internal::Action;
+use ::Transport;
 
-pub type Action_ = Action;
 
 pub trait Protocol<T: Transport> {
     fn on_readable(&mut self, transport: &mut T) -> Interest;
@@ -57,7 +57,7 @@ impl ::std::ops::Sub for Interest {
     }
 }
 
-impl Into<Action_> for Interest {
+impl Into<Action> for Interest {
     fn into(self) -> Action {
         match self {
             Interest::Read => Action::Register(EventSet::readable()),

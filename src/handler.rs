@@ -2,10 +2,10 @@ use mio::{self, EventLoop, Token, EventSet, PollOpt, TryAccept};
 
 use stream::Stream;
 use transfer;
-use ::{Action, Interest, Message, Protocol, ProtocolFactory, Transport};
+use ::{Interest, Protocol, ProtocolFactory, Transport};
+use internal::{Action, Message};
 
-pub type Message_ = Message;
-pub type Thunk = Box<FnMut() + Send + 'static>;
+//pub type Thunk = Box<FnMut() + Send + 'static>;
 
 pub struct LoopHandler<F: ProtocolFactory<T::Output>,  T: TryAccept + mio::Evented> where <T as TryAccept>::Output: Transport {
     pub transports: mio::util::Slab<Evented<F::Protocol, T>>,
@@ -80,27 +80,38 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> LoopHandler<F, 
     }
 
     fn action(&mut self, event_loop: &mut EventLoop<Self>, token: Token, action: Action) {
-        match action {
+        let next = match action {
             Action::Register(events) => {
                 match self.transports.get_mut(token) {
                     Some(&mut Evented::Stream(ref mut stream)) => {
                         debug!("  Action::Register {:?}, '{:?}'", token, events);
-                        event_loop.reregister(
+                        match event_loop.reregister(
                             stream.transport(),
                             token,
                             events,
                             PollOpt::level() | PollOpt::oneshot()
-                        );
+                        ) {
+                            Ok(..) => None,
+                            Err(e) => {
+                                stream.errored(e.into());
+                                Some(Action::Remove)
+                            }
+                        }
                     }
                     Some(_) => {
                         error!("cannot register listeners");
+                        None
                     }
                     None => {
                         warn!("  Action::Register unknown token {:?}, '{:?}'", token, events);
+                        None
                     }
                 }
             }
-            Action::Wait => debug!("  Action::Wait {:?}", token),
+            Action::Wait => {
+                debug!("  Action::Wait {:?}", token);
+                None
+            },
             Action::Remove => {
                 debug!("  Action::remove {:?}", token);
                 if let Some(slot) = self.transports.remove(token) {
@@ -114,8 +125,13 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> LoopHandler<F, 
                         }
                     }
                 }
+                None
             }
         };
+
+        if let Some(action) = next {
+            self.action(event_loop, token, action);
+        }
     }
 }
 
@@ -125,8 +141,9 @@ enum Ready<T: Transport> {
 }
 
 impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> mio::Handler for LoopHandler<F, T> where <T as TryAccept>::Output: Transport {
-    type Message = Message_;
-    type Timeout = Thunk;
+    type Message = Message;
+    type Timeout = ();
+    //type Timeout = Thunk;
     fn ready(&mut self, event_loop: &mut EventLoop<Self>, token: Token, events: EventSet) {
         debug!("< Ready {:?} '{:?}'", token, events);
         let next = match self.transports.get_mut(token) {
@@ -157,10 +174,12 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> mio::Handler fo
         }
     }
 
+    /*
     fn timeout(&mut self, _: &mut EventLoop<Self>, mut cb: Thunk) {
         debug!("< Timeout");
         cb();
     }
+    */
 
     fn notify(&mut self, event_loop: &mut EventLoop<Self>, msg: Message) {
         match msg {
@@ -186,10 +205,12 @@ impl<F: ProtocolFactory<T::Output>, T: TryAccept + mio::Evented> mio::Handler fo
                 };
                 self.action(event_loop, token, action);
             }
+            /*
             Message::Timeout(cb, when) => {
                 debug!("< Notify Message::Timeout {}ms", when);
                 event_loop.timeout_ms(cb, when);
             }
+            */
             Message::Shutdown => {
                 debug!("< Notify Message::Shutdown");
                 event_loop.shutdown();

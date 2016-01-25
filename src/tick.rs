@@ -1,10 +1,11 @@
-use std::time::Duration;
+//use std::time::Duration;
 
-use mio::{EventLoop, EventLoopConfig, Evented, EventSet, TryAccept};
+use mio::{EventLoop, Evented, EventLoopConfig, TryAccept};
 
 use handler::LoopHandler;
+use internal::Message;
 use transport::Transport;
-use ::{Message, ProtocolFactory};
+use ::ProtocolFactory;
 
 
 pub struct Tick<T: TryAccept + Evented, F: ProtocolFactory<T::Output>> where <T as TryAccept>::Output: Transport {
@@ -70,6 +71,7 @@ pub struct Notify {
 }
 
 impl Notify {
+    /*
     pub fn timeout<F: FnOnce() + Send + 'static>(&self, f: F, when: Duration) {
         let mut env = Some(f);
         let ms = when.as_secs() * 1_000 + (when.subsec_nanos() as u64) / 1_000_000;
@@ -77,6 +79,7 @@ impl Notify {
             env.take().map(|f| f());
         }), ms));
     }
+    */
     pub fn shutdown(&self) {
         self.sender.send(Message::Shutdown).unwrap();
     }

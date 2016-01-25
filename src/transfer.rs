@@ -1,8 +1,7 @@
 use std::fmt;
 use mio;
 
-use ::{Message};
-pub type Message_ = Message;
+use ::internal::Message;
 
 #[derive(Clone)]
 pub struct Transfer {
@@ -11,7 +10,7 @@ pub struct Transfer {
 }
 
 #[inline]
-pub fn new(token: mio::Token, notify: mio::Sender<Message_>) -> Transfer {
+pub fn new(token: mio::Token, notify: mio::Sender<Message>) -> Transfer {
     Transfer {
         token: token,
         notify: notify,

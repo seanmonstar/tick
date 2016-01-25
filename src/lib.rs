@@ -41,18 +41,7 @@ mod tick;
 mod transfer;
 mod transport;
 
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum Action {
-    Register(mio::EventSet),
-    Wait,
-    Remove,
-}
 
-enum Message {
-    Interest(mio::Token, Interest),
-    Timeout(Box<FnMut() + Send + 'static>, u64),
-    Shutdown,
-}
 
 #[derive(Debug)]
 pub enum Error {
@@ -93,3 +82,18 @@ impl slab::Index for Id {
 }
 
 pub type Slab<T> = slab::Slab<T, Id>;
+
+mod internal {
+    #[derive(Clone, Copy, PartialEq, Debug)]
+    pub enum Action {
+        Register(::mio::EventSet),
+        Wait,
+        Remove,
+    }
+
+    pub enum Message {
+        Interest(::mio::Token, ::Interest),
+        //Timeout(Box<FnMut() + Send + 'static>, u64),
+        Shutdown,
+    }
+}

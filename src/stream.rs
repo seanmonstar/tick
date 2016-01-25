@@ -26,6 +26,12 @@ impl<P: Protocol<T>, T: Transport> Stream<P, T> {
             //TODO: self.protocol.on_error(self.transport.error());
         }
 
+        if events.is_hup() {
+            error!("error event on {:?}", token);
+            self.interest = Interest::Remove;
+            return;
+        }
+
         if events.is_readable() {
             trace!("on_readable {:?} ->", token);
             self.interest = self.protocol.on_readable(&mut self.transport);
@@ -43,6 +49,10 @@ impl<P: Protocol<T>, T: Transport> Stream<P, T> {
 
     pub fn interest(&self) -> Interest {
         self.interest
+    }
+
+    pub fn errored(&mut self, err: ::Error) {
+        self.protocol.on_error(err);
     }
 
     pub fn removed(self) {
